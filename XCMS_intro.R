@@ -1,3 +1,4 @@
+# https://jorainer.github.io/metabolomics2018/xcms-preprocessing.html#34_Preprocessing_of_LC-MS_data
 # Install the Bioconductor package manager
 install.packages("BiocManager")
 
@@ -130,6 +131,69 @@ cwp <- CentWaveParam()
 res <- findChromPeaks(srn_chr, param = cwp)
 chromPeaks(res)
 
+cwp <- CentWaveParam(peakwidth = c(2, 10), integrate = 2)
+srn_chr <- findChromPeaks(srn_chr, param = cwp)
+plot(srn_chr)
+chromPeaks(srn_chr)
+
+#' Restrict the data to signal from Serine
+srn <- data_cent %>%
+  filterRt(rt = c(179, 186)) %>%
+  filterMz(mz = c(106.04, 106.06))
+
+#' Plot the data
+plot(srn, type = "XIC") 
+
+#' Extract intensities and split them by file. This will return
+#' a list of lists.
+ints_per_file <- split(intensity(srn), fromFile(srn))
+
+#' For each file, sum up the intensities.
+ints_sum <- lapply(ints_per_file, function(x) sum(unlist(x)))
+ints_sum
+
+#' Extract the Serine data for one file as a data.frame
+srn_df <- as(filterFile(srn, file = which.max(ints_sum)), "data.frame")
+
+#' The difference between m/z values from consecutive scans expressed
+#' in ppm
+diff(srn_df$mz) * 1e6 / mean(srn_df$mz) 
+
+# Perform peak detection
+cwp <- CentWaveParam(peakwidth = c(2, 10), ppm = 30, integrate = 2)
+data_cent <- findChromPeaks(data_cent, param = cwp)
+
+#' Access the peak detection results from a specific m/z - rt area
+chromPeaks(data_cent, mz = c(106, 107), rt = c(150, 190)) 
+
+eic_serine <- chromatogram(data_cent, mz = c(106.04, 106.06),
+                           rt = c(179, 186))
+chromPeaks(eic_serine)
+
+plot(eic_serine)
 
 
+srn <- data_cent %>%
+  filterRt(rt = c(175, 188)) %>%
+  filterMz(mz = c(106.04, 106.06))
+
+plot(srn, type = "XIC")
+
+mpp <- MergeNeighboringPeaksParam(expandRt = 4)
+data_cent_pp <- refineChromPeaks(data_cent, param = mpp)
+
+chromPeakData(data_cent_pp)
+mzr <- c(124.084, 124.088)
+rtr <- c(150, 170)
+chr_1 <- chromatogram(filterFile(data_cent, 2), mz = mzr, rt = rtr)
+chr_2 <- chromatogram(filterFile(data_cent_pp, 2), mz = mzr, rt = rtr)
+par(mfrow = c(1, 2))
+plot(chr_1)
+plot(chr_2)
+
+data_cent <- data_cent_pp
+
+par(mfrow = c(1, 2))
+plotChromPeaks(data_cent, 1)
+plotChromPeaks(data_cent, 2) 
 
