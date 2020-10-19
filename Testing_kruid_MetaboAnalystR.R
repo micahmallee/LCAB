@@ -1,6 +1,22 @@
 library(MetaboAnalystR)
 library(xcms)
 
+metanr_packages <- function(){
+  metr_pkgs <- c("impute", "pcaMethods", "globaltest", "GlobalAncova", "Rgraphviz", "preprocessCore", "genefilter", "SSPA", "sva", "limma", "KEGGgraph", "siggenes","BiocParallel", "MSnbase", "multtest","RBGL","edgeR","fgsea","devtools","crmn")
+  list_installed <- installed.packages()
+  new_pkgs <- subset(metr_pkgs, !(metr_pkgs %in% list_installed[, "Package"]))
+  if(length(new_pkgs)!=0){if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+    BiocManager::install(new_pkgs)
+    print(c(new_pkgs, " packages added..."))
+  }
+  
+  if((length(new_pkgs)<1)){
+    print("No new packages added...")
+  }
+}
+
+
 
 fls <- dir(path = "mzxml", full.names = TRUE)
 pd <- data.frame(file = basename(fls),
@@ -11,9 +27,9 @@ peperdata <- readMSData(fls, pdata = new("NAnnotatedDataFrame", pd),
                    mode = "onDisk") 
 
 
+MetaboAnalystR::ImportRawMSData(foldername = "mzxml", mode = "onDisk")
 
-
-peperdata2 <- ImportRawMSData("mzxml/")
+peperdata2 <- ImportRawMSData("C://Users/Micah/Documents/Data_IBD/", mode = 'onDisk', plotSettings = 'all')
 
 
 

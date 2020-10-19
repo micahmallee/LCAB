@@ -1,0 +1,41 @@
+---
+title: "kanekrzooi"
+output: html_document
+---
+
+```{r}
+library(MetaboAnalystR)
+
+plotkanekr <- SetPlotParam(Plot = T,labels = T, format = 'png', dpi = 72)
+oke <- MetaboAnalystR::ImportRawMSData(foldername = "C://Users/Micah/Documents/Data_IBD", mode = "onDisk", plotSettings = plotkanekr)
+
+
+
+via_MSnbase <- readMSData(files = 'mzxml/KRUID_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML', mode = 'onDisk')
+
+via_metaboanalyst <- MetaboAnalystR::ImportRawMSData(foldername = "mzxml", mode = "onDisk", plotSettings = plotkanekr)
+
+
+
+parameter_kruid_data <- PerformDataTrimming('~/QC_IBD', rt.idx = '0.2')
+ruwe__kruid_data <- ImportRawMSData(foldername = "mzxml", mode = "onDisk", plotSettings = plotkanekr)
+param_initial <- SetPeakParam(platform = "general") 
+param_optimized <- PerformParamsOptimization(raw_data, param = param_initial, ncore = 8)
+
+mSet <- PerformPeakProfiling(rawData = via_metaboanalyst, Params = SetPeakParam(Peak_method = 'centWave', min_peakwidth = 2, max_peakwidth = 10))
+
+
+
+rawData <- ImportRawMSData(data_folder_Sample,plotSettings = SetPlotParam(Plot=F))
+
+mSet <- PerformPeakProfiling(rawData,param_optimized$best_parameters,
+                             plotSettings = SetPlotParam(Plot = T))
+annParams <- SetAnnotationParam(polarity = "negative", mz_abs_add = 0.005)
+annotPeaks <- PerformPeakAnnotation(mSet, annParams)
+maPeaks <- FormatPeakList(annotPeaks, annParams, filtIso =F, filtAdducts = FALSE,
+                          missPercent = 1)
+
+
+
+```
+
