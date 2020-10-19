@@ -15,6 +15,11 @@ rtime(kruid_data)
 kruid_chr <- chromatogram(kruid_data)
 plot(kruid_chr)
 
+filt_kruid_data <- filterRt(kruid_data, c(500, 2500))
+plot(chromatogram(filt_kruid_data))
+# even een peak eruit halen
+
+
 # default centwave parameters:
 cwp <- CentWaveParam()
 
