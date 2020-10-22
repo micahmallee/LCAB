@@ -25,8 +25,13 @@ out
 
 raw_data <- PerformDataTrimming(data_folder_QC,rt.idx = 0.2)
 
+<<<<<<< HEAD
 param_initial1 <- SetPeakParam(platform = "UPLC-Q/E") 
 param_optimized <- PerformParamsOptimization(raw_data, param = param_initial1, ncore = 8)
+=======
+param_initial <- SetPeakParam(platform = "UPLC-Q/E") 
+param_optimized <- PerformParamsOptimization(raw_data, param = param_initial, ncore = 8)
+>>>>>>> 33a24d16e580fe338d6631274b55e8c25ecacce5
 
 rawData <- ImportRawMSData(data_folder_Sample,plotSettings = SetPlotParam(Plot=F))
 
