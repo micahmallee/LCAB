@@ -18,11 +18,9 @@ plot(kruid_chr)
 filt_kruid_data <- filterRt(kruid_data, c(500, 2500))
 plot(chromatogram(filt_kruid_data))
 # even een peak eruit halen
-<<<<<<< HEAD
 cwp <- CentWaveParam(peakwidth = c(10, 30))
 okeee <- findChromPeaks(filt_kruid_data, param = cwp)
-=======
->>>>>>> 33a24d16e580fe338d6631274b55e8c25ecacce5
+
 
 
 # default centwave parameters:
