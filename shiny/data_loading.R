@@ -7,7 +7,6 @@ ui <- fluidPage(
   mainPanel(
     textOutput('path')
   )
-  
 )
 
 server <- function(input, output){
