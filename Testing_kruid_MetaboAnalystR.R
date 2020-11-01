@@ -16,24 +16,31 @@ metanr_packages <- function(){
   }
 }
 
+mSet<-InitDataObjects("pktable", "stat", FALSE)
+mSet<-Read.TextData(mSet, "metaboanalyst_input.csv", "colu", "disc")
+
+# Eerst data trimmen/inlezen om daarmee later de parameters te bepalen (samples in 1 folder)
+kruiden <- PerformDataTrimming("mzxml/", rt.idx = 1)
+
+# Standaard parameters vaststellen
+param_initial <- SetPeakParam(platform = "general")
+
+param_initial2 <- SetPeakParam(Peak_method = 'matchedFilter')
+# Door middel van trimmed kruiden data de parameters optimaliseren
+param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_initial)
+
+param_optimized2 <- PerformParamsOptimization(raw_data = kruiden, param = param_initial2, ncore = 8)
+
+# Raw kruiden data inlezen
+raw_kruiden <- ImportRawMSData(foldername = "mzxml/", mode = "onDisk", plotSettings = SetPlotParam(Plot = T))
 
 
-fls <- dir(path = "mzxml", full.names = TRUE)
-pd <- data.frame(file = basename(fls),
-                 sample = c("Peper_5", "Peper_6"),
-                 group = "Peper")
-
-peperdata <- readMSData(fls, pdata = new("NAnnotatedDataFrame", pd),
-                   mode = "onDisk") 
-
-
-MetaboAnalystR::ImportRawMSData(foldername = "mzxml", mode = "onDisk")
-
-peperdata2 <- ImportRawMSData("C://Users/Micah/Documents/Data_IBD/", mode = 'onDisk', plotSettings = 'all')
-
-
-
-oke <- PerformPeakProfiling(rawData = peperdata, Params = param_initial, plotSettings = SetPlotParam(Plot = TRUE))
+# Peak profiling uitvoeren 
+#'The PerformPeakProfiling function is an updated peak processing pipeline from XCMS R functions that performs peak detection, alignment, and grouping in an automatical step. 
+#'The function also generates two diagnostic plots including statistics on the total intensity of peaks in different samples, a retention time adjustment map, 
+#'and a PCA plot showing the overall sample clustering prior to data cleaning and statistical analysis.
+mSet <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_optimized$best_parameters)
+mSet_matchedFilter <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_optimized2$best_parameters)
 
 kruiden_trimmed <- PerformDataTrimming("mzxml/KRUID_131/", rt.idx = 1)
 param_initial <- SetPeakParam(platform = "general")
@@ -46,16 +53,12 @@ param_optimized <- PerformParamsOptimization(raw_data = parameter_data, param = 
 psettings <- SetPlotParam(Plot = T,labels = T, format = 'png', dpi = 72)
 ruwe__kruid_data <- ImportRawMSData(foldername = "mzxml", mode = "onDisk", plotSettings = psettings)
 mSet <- PerformPeakProfiling(rawData = kruiden, Params = param_optimized)
+
+# Annotatie parameters vaststellen
 annParams <- SetAnnotationParam(polarity = "positive")
+
+# Peaklist maken die ingelezen kan worden door de Metaboanalyst webapp
 annotPeaks <- PerformPeakAnnotation(mSet = mSet, annotaParam = annParams)
-maPeaks <- FormatPeakList(annotPeaks = annotPeaks, annParams = annParams, filtIso = F, filtAdducts = F, missPercent = 1)
 
-mSet<-InitDataObjects("pktable", "stat", FALSE)
-mSet<-Read.TextData(mSet, "metaboanalyst_input.csv", "colu", "disc")
-
-
-
-
-
-
+oke <- ImportRawMSData(foldername = "mzxml/Kruid_131/", mode = 'onDisk')
 
