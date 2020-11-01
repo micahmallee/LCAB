@@ -35,9 +35,16 @@ peperdata2 <- ImportRawMSData("C://Users/Micah/Documents/Data_IBD/", mode = 'onD
 
 oke <- PerformPeakProfiling(rawData = peperdata, Params = param_initial, plotSettings = SetPlotParam(Plot = TRUE))
 
-kruiden <- PerformDataTrimming("mzxml/", rt.idx = 1)
+kruiden_trimmed <- PerformDataTrimming("mzxml/KRUID_131/", rt.idx = 1)
 param_initial <- SetPeakParam(platform = "general")
-param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_initial)
+param_optimized <- PerformParamsOptimization(raw_data = kruiden_trimmed, param = param_initial)
+
+parameter_data <- PerformDataTrimming('~/QC_IBD', rt.idx = '0.2')
+param_initial <- SetPeakParam(platform = "UPLC-Q/E")
+param_optimized <- PerformParamsOptimization(raw_data = parameter_data, param = param_initial)
+
+psettings <- SetPlotParam(Plot = T,labels = T, format = 'png', dpi = 72)
+ruwe__kruid_data <- ImportRawMSData(foldername = "mzxml", mode = "onDisk", plotSettings = psettings)
 mSet <- PerformPeakProfiling(rawData = kruiden, Params = param_optimized)
 annParams <- SetAnnotationParam(polarity = "positive")
 annotPeaks <- PerformPeakAnnotation(mSet = mSet, annotaParam = annParams)
@@ -49,8 +56,6 @@ mSet<-Read.TextData(mSet, "metaboanalyst_input.csv", "colu", "disc")
 
 
 
-raw_kruid_6 <- PerformDataTrimming("mzxml/", rt.idx = 1)
-param_initial <- SetPeakParam(platform = "general")
-param_optimized <- PerformParamsOptimization(raw_kruid_6, param = param_initial)
 
-mSet <- PerformPeakProfiling(raw_kruid_6, Params = param_initial)
+
+
