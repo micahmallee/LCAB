@@ -42,18 +42,6 @@ raw_kruiden <- ImportRawMSData(foldername = "mzxml/", mode = "onDisk", plotSetti
 mSet <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_optimized$best_parameters)
 mSet_matchedFilter <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_optimized2$best_parameters)
 
-kruiden_trimmed <- PerformDataTrimming("mzxml/KRUID_131/", rt.idx = 1)
-param_initial <- SetPeakParam(platform = "general")
-param_optimized <- PerformParamsOptimization(raw_data = kruiden_trimmed, param = param_initial)
-
-parameter_data <- PerformDataTrimming('~/QC_IBD', rt.idx = '0.2')
-param_initial <- SetPeakParam(platform = "UPLC-Q/E")
-param_optimized <- PerformParamsOptimization(raw_data = parameter_data, param = param_initial)
-
-psettings <- SetPlotParam(Plot = T,labels = T, format = 'png', dpi = 72)
-ruwe__kruid_data <- ImportRawMSData(foldername = "mzxml", mode = "onDisk", plotSettings = psettings)
-mSet <- PerformPeakProfiling(rawData = kruiden, Params = param_optimized)
-
 # Annotatie parameters vaststellen
 annParams <- SetAnnotationParam(polarity = "positive")
 
@@ -61,4 +49,3 @@ annParams <- SetAnnotationParam(polarity = "positive")
 annotPeaks <- PerformPeakAnnotation(mSet = mSet, annotaParam = annParams)
 
 oke <- ImportRawMSData(foldername = "mzxml/Kruid_131/", mode = 'onDisk')
-
