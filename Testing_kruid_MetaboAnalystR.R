@@ -25,14 +25,19 @@ kruiden <- PerformDataTrimming("mzxml/", rt.idx = 1)
 # Standaard parameters vaststellen
 param_initial <- SetPeakParam(platform = "general")
 
-param_initial2 <- SetPeakParam(Peak_method = 'matchedFilter')
+# matched filter:
+param_initial2 <- SetPeakParam(platform = 'general', Peak_method = 'matchedFilter')
+param_optimized2 <- PerformParamsOptimization(raw_data = kruiden, param = param_initial2, ncore = 1)
+#mSet2_matchedFilter <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_optimized2$best_parameters)
+mSet2_matchedFilter <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_initial2, plotSettings = SetPlotParam(Plot = TRUE))
+annParams2 <- SetAnnotationParam(polarity = "positive")
+annotPeaks2 <- PerformPeakAnnotation(mSet = mSet2_matchedFilter, annotaParam = annParams2)
 # Door middel van trimmed kruiden data de parameters optimaliseren
-param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_initial)
+param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_initial, ncore = 1)
 
-param_optimized2 <- PerformParamsOptimization(raw_data = kruiden, param = param_initial2, ncore = 8)
 
 # Raw kruiden data inlezen
-raw_kruiden <- ImportRawMSData(foldername = "mzxml/", mode = "onDisk", plotSettings = SetPlotParam(Plot = T))
+raw_kruiden <- ImportRawMSData(foldername = "mzxml/", mode = "onDisk", plotSettings = SetPlotParam(Plot = F))
 
 
 # Peak profiling uitvoeren 
@@ -40,7 +45,6 @@ raw_kruiden <- ImportRawMSData(foldername = "mzxml/", mode = "onDisk", plotSetti
 #'The function also generates two diagnostic plots including statistics on the total intensity of peaks in different samples, a retention time adjustment map, 
 #'and a PCA plot showing the overall sample clustering prior to data cleaning and statistical analysis.
 mSet <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_optimized$best_parameters)
-mSet_matchedFilter <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_optimized2$best_parameters)
 
 # Annotatie parameters vaststellen
 annParams <- SetAnnotationParam(polarity = "positive")

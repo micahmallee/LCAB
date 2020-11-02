@@ -21,8 +21,10 @@ filt_kruid_data <- filterRt(kruid_data, c(500, 2500))
 plot(chromatogram(filt_kruid_data))
 # Findpeaks:
 xcms_cwp <- CentWaveParam(peakwidth = c(3, 37.5), ppm = 22.35, snthresh = 5, mzCenterFun = "wMean", prefilter = c(2, 0.02), integrate = 1, mzdiff = 0, fitgauss = F, noise = 0, verboseColumns = F)
+xcms_cwp2 <- CentWaveParam(peakwidth = c(3, 37.5), ppm = 22.35, snthresh = 10, mzCenterFun = "wMean", prefilter = c(2, 0.02), integrate = 1, mzdiff = 0, fitgauss = F, noise = 0, verboseColumns = F)
 xcms_peaks <- findChromPeaks(xcms_kruid_data, param = xcms_cwp)
-
+xcms_peaks2 <- findChromPeaks(xcms_kruid_data, param = xcms_cwp2)
+plot(chromatogram(xcms_peaks2))
 # Plot peaks
 chromPeaks(xcms_peaks)
 plot(chromatogram(xcms_peaks))
@@ -32,7 +34,7 @@ mpp <- MergeNeighboringPeaksParam(expandRt = 4)
 refined_xcms_peaks <- refineChromPeaks(xcms_peaks, param = mpp)
 # Show refined peaks
 chromPeaks(refined_xcms_peaks)
-plot(refined_xcms_peaks)
+plot(chromPeaks(refined_xcms_peaks))
 
 
 
