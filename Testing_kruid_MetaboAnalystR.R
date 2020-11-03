@@ -23,7 +23,7 @@ mSet<-Read.TextData(mSet, "metaboanalyst_input.csv", "colu", "disc")
 kruiden <- PerformDataTrimming("mzxml/", rt.idx = 1)
 
 # Standaard parameters vaststellen
-param_initial <- SetPeakParam(platform = "general")
+param_initial <- SetPeakParam(platform = "general", snthresh = 10)
 
 # matched filter:
 param_initial2 <- SetPeakParam(platform = 'general', Peak_method = 'matchedFilter')
@@ -33,18 +33,19 @@ mSet2_matchedFilter <- PerformPeakProfiling(rawData = raw_kruiden, Params = para
 annParams2 <- SetAnnotationParam(polarity = "positive")
 annotPeaks2 <- PerformPeakAnnotation(mSet = mSet2_matchedFilter, annotaParam = annParams2)
 # Door middel van trimmed kruiden data de parameters optimaliseren
-param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_initial, ncore = 1)
+param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_initial)
 
 
 # Raw kruiden data inlezen
-raw_kruiden <- ImportRawMSData(foldername = "mzxml/", mode = "onDisk", plotSettings = SetPlotParam(Plot = F))
+raw_kruiden <- ImportRawMSData(foldername = "mzxml/", mode = "onDisk", plotSettings = SetPlotParam(Plot = T))
 
 
 # Peak profiling uitvoeren 
 #'The PerformPeakProfiling function is an updated peak processing pipeline from XCMS R functions that performs peak detection, alignment, and grouping in an automatical step. 
 #'The function also generates two diagnostic plots including statistics on the total intensity of peaks in different samples, a retention time adjustment map, 
 #'and a PCA plot showing the overall sample clustering prior to data cleaning and statistical analysis.
-mSet <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_optimized$best_parameters)
+mSet <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_optimized)
+
 
 # Annotatie parameters vaststellen
 annParams <- SetAnnotationParam(polarity = "positive")
