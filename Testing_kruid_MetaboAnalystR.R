@@ -20,7 +20,7 @@ mSet<-InitDataObjects("pktable", "stat", FALSE)
 mSet<-Read.TextData(mSet, "metaboanalyst_input.csv", "colu", "disc")
 
 # Eerst data trimmen/inlezen om daarmee later de parameters te bepalen (samples in 1 folder)
-kruiden <- PerformDataTrimming("mzxml/", rt.idx = 1)
+kruiden <- PerformDataTrimming("mzxml/KRUID_46/Kruid_46/", rt.idx = 1)
 
 # Standaard parameters vaststellen
 param_initial <- SetPeakParam(platform = "general", snthresh = 10)
@@ -33,11 +33,11 @@ mSet2_matchedFilter <- PerformPeakProfiling(rawData = raw_kruiden, Params = para
 annParams2 <- SetAnnotationParam(polarity = "positive")
 annotPeaks2 <- PerformPeakAnnotation(mSet = mSet2_matchedFilter, annotaParam = annParams2)
 # Door middel van trimmed kruiden data de parameters optimaliseren
-param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_initial)
+param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_initial, ncore = 1)
 
 
 # Raw kruiden data inlezen
-raw_kruiden <- ImportRawMSData(foldername = "mzxml/", mode = "onDisk", plotSettings = SetPlotParam(Plot = T))
+raw_kruiden <- ImportRawMSData(foldername = "mzxml/KRUID_46/Kruid_46/", mode = "onDisk", plotSettings = SetPlotParam(Plot = T))
 
 
 # Peak profiling uitvoeren 
