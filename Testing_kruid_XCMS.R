@@ -8,7 +8,7 @@ library(png)
 library(baseline)
 
 # Load data
-xcms_kruid_data <- readMSData(files = "mzxml/KRUID_46/Kruid 46 Klapper_119.mzXML", mode = "onDisk")
+xcms_kruid_data <- readMSData(files = "cocosnoot/Kruid 46 Klapper_119.mzXML", mode = "onDisk")
 
 
 
@@ -22,7 +22,7 @@ filt_kruid_data <- filterRt(kruid_data, c(500, 2500))
 plot(chromatogram(filt_kruid_data))
 # Findpeaks:
 xcms_cwp <- CentWaveParam(peakwidth = c(3, 37.5), ppm = 22.35, snthresh = 5, mzCenterFun = "wMean", prefilter = c(2, 0.02), integrate = 1, mzdiff = 0, fitgauss = F, noise = 0, verboseColumns = F)
-xcms_cwp2 <- CentWaveParam(peakwidth = c(3, 37.5), ppm = 22.35, snthresh = 10, mzCenterFun = "wMean", prefilter = c(2, 0.02), integrate = 1, mzdiff = 0, fitgauss = F, noise = 0, verboseColumns = F)
+xcms_cwp2 <- CentWaveParam(peakwidth = c(3, 60), ppm = 27, snthresh = 5, mzCenterFun = "wMean", prefilter = c(2, 0.004), integrate = 1, mzdiff = 0, fitgauss = F, noise = 0, verboseColumns = F)
 xcms_peaks <- findChromPeaks(xcms_kruid_data, param = xcms_cwp)
 xcms_peaks2 <- findChromPeaks(xcms_kruid_data, param = xcms_cwp2)
 plot(chromatogram(xcms_peaks2))

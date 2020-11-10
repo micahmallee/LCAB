@@ -16,29 +16,18 @@ metanr_packages <- function(){
   }
 }
 
-mSet<-InitDataObjects("pktable", "stat", FALSE)
-mSet<-Read.TextData(mSet, "metaboanalyst_input.csv", "colu", "disc")
-
 # Eerst data trimmen/inlezen om daarmee later de parameters te bepalen (samples in 1 folder)
-kruiden <- PerformDataTrimming("mzxml/KRUID_46/Kruid_46/", rt.idx = 1)
+kruiden <- PerformDataTrimming("mzxml/", rt.idx = 1)
 
 # Standaard parameters vaststellen
 param_initial <- SetPeakParam(platform = "general", snthresh = 10)
 
-# matched filter:
-param_initial2 <- SetPeakParam(platform = 'general', Peak_method = 'matchedFilter')
-param_optimized2 <- PerformParamsOptimization(raw_data = kruiden, param = param_initial2, ncore = 1)
-#mSet2_matchedFilter <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_optimized2$best_parameters)
-mSet2_matchedFilter <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_initial2, plotSettings = SetPlotParam(Plot = TRUE))
-annParams2 <- SetAnnotationParam(polarity = "positive")
-annotPeaks2 <- PerformPeakAnnotation(mSet = mSet2_matchedFilter, annotaParam = annParams2)
 # Door middel van trimmed kruiden data de parameters optimaliseren
-param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_initial, ncore = 1)
-
+param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_initial)
 
 # Raw kruiden data inlezen
-raw_kruiden <- ImportRawMSData(foldername = "mzxml/KRUID_46/Kruid_46/", mode = "onDisk", plotSettings = SetPlotParam(Plot = T))
-
+## Grouped data
+raw_kruiden <- ImportRawMSData(foldername = "mzxml/", mode = "onDisk", plotSettings = SetPlotParam(Plot = F))
 
 # Peak profiling uitvoeren 
 #'The PerformPeakProfiling function is an updated peak processing pipeline from XCMS R functions that performs peak detection, alignment, and grouping in an automatical step. 
@@ -53,4 +42,18 @@ annParams <- SetAnnotationParam(polarity = "positive")
 # Peaklist maken die ingelezen kan worden door de Metaboanalyst webapp
 annotPeaks <- PerformPeakAnnotation(mSet = mSet, annotaParam = annParams)
 
-oke <- ImportRawMSData(foldername = "mzxml/Kruid_131/", mode = 'onDisk')
+
+# matched filter:
+param_initial2 <- SetPeakParam(platform = 'general', Peak_method = 'matchedFilter')
+param_optimized2 <- PerformParamsOptimization(raw_data = kruiden, param = param_initial2, ncore = 1)
+#mSet2_matchedFilter <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_optimized2$best_parameters)
+mSet2_matchedFilter <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_initial2, plotSettings = SetPlotParam(Plot = TRUE))
+annParams2 <- SetAnnotationParam(polarity = "positive")
+annotPeaks2 <- PerformPeakAnnotation(mSet = mSet2_matchedFilter, annotaParam = annParams2)
+
+# cocosnoot:
+cocosnoot_trimmed <- PerformDataTrimming("cocosnoot/", rt.idx = 1)
+param_initial <- SetPeakParam(platform = "general", snthresh = 10)
+param_optimized_cocosnoot <- PerformParamsOptimization(raw_data = cocosnoot_trimmed, param = param_initial)
+
+# one sample:
