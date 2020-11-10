@@ -20,7 +20,7 @@ mSet<-InitDataObjects("pktable", "stat", FALSE)
 mSet<-Read.TextData(mSet, "metaboanalyst_input.csv", "colu", "disc")
 
 # Eerst data trimmen/inlezen om daarmee later de parameters te bepalen (samples in 1 folder)
-kruiden <- PerformDataTrimming("mzxml/KRUID_46/Kruid_46/", rt.idx = 1)
+kruiden <- PerformDataTrimming("kruiden/", rt.idx = 1)
 
 # Standaard parameters vaststellen
 param_initial <- SetPeakParam(platform = "general", snthresh = 10)
@@ -33,12 +33,15 @@ mSet2_matchedFilter <- PerformPeakProfiling(rawData = raw_kruiden, Params = para
 annParams2 <- SetAnnotationParam(polarity = "positive")
 annotPeaks2 <- PerformPeakAnnotation(mSet = mSet2_matchedFilter, annotaParam = annParams2)
 # Door middel van trimmed kruiden data de parameters optimaliseren
-param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_initial, ncore = 1)
+param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_initial)
 
 
 # Raw kruiden data inlezen
-raw_kruiden <- ImportRawMSData(foldername = "mzxml/KRUID_46/Kruid_46/", mode = "onDisk", plotSettings = SetPlotParam(Plot = T))
+## Grouped data
+raw_kruiden <- ImportRawMSData(foldername = "mzxml/", mode = "onDisk", plotSettings = SetPlotParam(Plot = F))
 
+## Solo data
+raw_cocosnoot <- readMSData(files = 'cocosnoot/Kruid 46 Klapper_119.mzXML', mode = 'onDisk')
 
 # Peak profiling uitvoeren 
 #'The PerformPeakProfiling function is an updated peak processing pipeline from XCMS R functions that performs peak detection, alignment, and grouping in an automatical step. 
@@ -52,5 +55,3 @@ annParams <- SetAnnotationParam(polarity = "positive")
 
 # Peaklist maken die ingelezen kan worden door de Metaboanalyst webapp
 annotPeaks <- PerformPeakAnnotation(mSet = mSet, annotaParam = annParams)
-
-oke <- ImportRawMSData(foldername = "mzxml/Kruid_131/", mode = 'onDisk')

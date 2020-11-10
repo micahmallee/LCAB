@@ -40,7 +40,9 @@ server <- function(input, output){
       output$inspect_plot <- renderPlot(PerformDataInspect(input$data_input$datapath))
     }
     else {
-      raw_data <- ImportRawMSData(foldername = input$data_input$datapath, plotSettings = SetPlotParam(Plot = F), mode = 'inMemory')
+      oke <- input$data_input$datapath[[1]][-5]
+      oke <- paste(oke, collapse = '/')
+      raw_data <- ImportRawMSData(foldername = oke, plotSettings = SetPlotParam(Plot = F), mode = 'inMemory')
       output$inspect_plot <- renderPlot(plot(chromatogram(raw_data)))
     }
   })
