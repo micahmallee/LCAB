@@ -29,6 +29,8 @@ param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_i
 ## Grouped data
 raw_kruiden <- ImportRawMSData(foldername = "mzxml/", mode = "onDisk", plotSettings = SetPlotParam(Plot = F))
 
+## Solo data
+
 # Peak profiling uitvoeren 
 #'The PerformPeakProfiling function is an updated peak processing pipeline from XCMS R functions that performs peak detection, alignment, and grouping in an automatical step. 
 #'The function also generates two diagnostic plots including statistics on the total intensity of peaks in different samples, a retention time adjustment map, 
@@ -42,7 +44,6 @@ annParams <- SetAnnotationParam(polarity = "positive")
 # Peaklist maken die ingelezen kan worden door de Metaboanalyst webapp
 annotPeaks <- PerformPeakAnnotation(mSet = mSet, annotaParam = annParams)
 
-
 # matched filter:
 param_initial2 <- SetPeakParam(platform = 'general', Peak_method = 'matchedFilter')
 param_optimized2 <- PerformParamsOptimization(raw_data = kruiden, param = param_initial2, ncore = 1)
@@ -55,5 +56,6 @@ annotPeaks2 <- PerformPeakAnnotation(mSet = mSet2_matchedFilter, annotaParam = a
 cocosnoot_trimmed <- PerformDataTrimming("cocosnoot/", rt.idx = 1)
 param_initial <- SetPeakParam(platform = "general", snthresh = 10)
 param_optimized_cocosnoot <- PerformParamsOptimization(raw_data = cocosnoot_trimmed, param = param_initial)
+raw_cocosnoot <- readMSData(files = 'cocosnoot/Kruid 46 Klapper_119.mzXML', mode = 'onDisk')
 
 # one sample:
