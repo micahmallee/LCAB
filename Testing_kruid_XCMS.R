@@ -51,10 +51,10 @@ xcms_foundpeaks <- findPeaks(rawxcms)
 pd <- data.frame(file = basename(dir('kruiden/', full.names = T)),
                  sample = c("Kruid_130", "Kruid_131"),
                  group = "Pepers")
-xcms_beide <- readMSData(files = dir('kruiden/', full.names = T), mode = 'onDisk', pdata = pd)
+xcms_beide <- readMSData(files = dir('kruiden/', full.names = T), mode = 'onDisk')
 
 # Peak profiling parameters bepalen
-xcms_cwp <- CentWaveParam(peakwidth = c(3, 37.5), ppm = 22.35, snthresh = 5, mzCenterFun = "wMean", prefilter = c(2, 0.02), integrate = 1, mzdiff = 0, fitgauss = F, noise = 0, verboseColumns = F)
+xcms_cwp <- CentWaveParam(peakwidth = c(3, 37.5), ppm = 22.35, snthresh = 10, mzCenterFun = "wMean", prefilter = c(2, 0.02), integrate = 1, mzdiff = 0, fitgauss = F, noise = 0, verboseColumns = F)
 # Peaks vinden
 xcms_peaks_beide <- findChromPeaks(xcms_beide, param = xcms_cwp)
 

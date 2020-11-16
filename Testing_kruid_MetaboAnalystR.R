@@ -59,3 +59,49 @@ param_optimized_cocosnoot <- PerformParamsOptimization(raw_data = cocosnoot_trim
 raw_cocosnoot <- readMSData(files = 'cocosnoot/Kruid 46 Klapper_119.mzXML', mode = 'onDisk')
 
 # one sample:
+raw_peper <- readMSData(files = 'mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML', mode = 'onDisk')
+load('optimized_params')
+smSet <- PerformPeakPicking(raw_peper, param = updateRawSpectraParam(param_optimized))
+smSet <- PerformPeakAlignment(smSet, param = updateRawSpectraParam(param_optimized))
+smSet <- MetaboAnalystR:::PerformPeakGrouping(smSet, param = updateRawSpectraParam(param_optimized))
+
+kijk <- MetaboAnalystR::PerformPeakAlignment(mSet = smSet, param = updateRawSpectraParam(param_optimized))
+
+peaks_0 <- mSet[["msFeatureData"]][["chromPeaks"]]
+
+
+# Plot found peaks for one sample:
+plotMARPeaks <- function(mSet) {
+  nSamples <- length(seq_along(mSet[["onDiskData"]]@phenoData@data[["sample_name"]]))
+  # if (nSamples = 0) {
+  #   nSamples <- 1
+  # } else {
+  #   nSamples <- nSamples
+  # }
+  chr <- chromatogram(mSet[['onDiskData']])
+  xchr <- as(chr, 'XChromatograms')
+  allpeaks <- xchr$msFeatureData$chromPeaks
+  allpeaks <- as.data.frame(allpeaks)
+  allpeaks <- split(allpeaks, allpeaks$sample)
+  lapply(xchr, function(z){
+    xchr[[z]]@chromPeaks <- 
+    z@chromPeakData <- as(allpeaks[[z]], 'DFrame')
+  })
+  res <- lapply(xchr, function(z) {
+    xchr[[z]]@chromPeaks <- mSet[["msFeatureData"]][["chromPeaks"]]
+    xchr[[z]]@chromPeakData <- mSet[["msFeatureData"]][["chromPeakData"]]
+  })
+  return(res)
+}
+
+assa <- function(mSet, x) {
+  xchr[[x]]@chromPeaks <- mSet[["msFeatureData"]][["chromPeaks"]]
+  xchr[[x]]@chromPeakData <- mSet[["msFeatureData"]][["chromPeakData"]]
+  return(xchr)
+}
+
+counter <- 0
+lapply(1:length(xchr), function(x) {
+  counter <<- counter + 1
+  xchr[[counter]]@chromPeakData <- as(allpeaks[[counter]], 'DFrame')
+})
