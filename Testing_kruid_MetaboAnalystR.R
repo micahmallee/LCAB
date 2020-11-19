@@ -60,24 +60,34 @@ raw_cocosnoot <- readMSData(files = 'cocosnoot/Kruid 46 Klapper_119.mzXML', mode
 
 # one sample:
 raw_peper <- readMSData(files = 'mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML', mode = 'onDisk')
-load('optimized_params')
+param_optimized <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', mzdiff = 0, snthresh = 10, bw = 2, ppm = 22.35, min_peakwidth = 3, max_peakwidth = 37.5, noise = 0, prefilter = 2, value_of_prefilter = 0.02, minFraction = 0.5, minSamples = 1, maxFeatures = 100, extra = 1, span = 0.25, smooth = 'loess', family = 'gaussian', verbose.columns = FALSE, fitgauss = FALSE, integrate = 1, mzCenterFun = "wMean")
+# load('optimized_params')
 smSet <- PerformPeakPicking(raw_peper, param = updateRawSpectraParam(param_optimized))
-smSet <- PerformPeakAlignment(smSet, param = updateRawSpectraParam(param_optimized))
+# smSet <- PerformPeakAlignment(smSet, param = updateRawSpectraParam(param_optimized))
 smSet <- MetaboAnalystR:::PerformPeakGrouping(smSet, param = updateRawSpectraParam(param_optimized))
+smSet <- PerformPeakFiling(smSet, param = updateRawSpectraParam(param_optimized))
+
+annotPeaks_solo <- PerformPeakAnnotation(mSet = smSet, annotaParam = annParams2)
 
 kijk <- MetaboAnalystR::PerformPeakAlignment(mSet = smSet, param = updateRawSpectraParam(param_optimized))
 
-peaks_0 <- mSet[["msFeatureData"]][["chromPeaks"]]
 
+param_optimized <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', mzdiff = 0,
+                                snthresh = 10, bw = 2, ppm = 22.35, min_peakwidth = 3, max_peakwidth = 37.5, 
+                                noise = 1000, prefilter = 2, value_of_prefilter = 0.02, minFraction = 0.5, 
+                                minSamples = 1, maxFeatures = 100, extra = 1, span = 0.25, smooth = 'loess', 
+                                family = 'gaussian', verbose.columns = FALSE, fitgauss = FALSE, integrate = 1, 
+                                mzCenterFun = "wMean")
+
+chr <- chromatogram(smSet[['onDiskData']])
+xchr <- as(chr, 'XChromatograms')
+xchr[[1]]@chromPeaks <- smSet[["msFeatureData"]][["chromPeaks"]]
+xchr[[1]]@chromPeakData <- smSet[["msFeatureData"]][["chromPeakData"]]
+plot(xchr)
 
 # Plot found peaks for one sample:
 plotMARPeaks <- function(mSet) {
   nSamples <- length(seq_along(mSet[["onDiskData"]]@phenoData@data[["sample_name"]]))
-  # if (nSamples = 0) {
-  #   nSamples <- 1
-  # } else {
-  #   nSamples <- nSamples
-  # }
   chr <- chromatogram(mSet[['onDiskData']])
   xchr <- as(chr, 'XChromatograms')
   allpeaks <- xchr$msFeatureData$chromPeaks
