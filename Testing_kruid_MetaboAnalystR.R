@@ -1,5 +1,6 @@
 library(MetaboAnalystR)
 library(xcms)
+library(magrittr)
 
 metanr_packages <- function(){
   metr_pkgs <- c("impute", "pcaMethods", "globaltest", "GlobalAncova", "Rgraphviz", "preprocessCore", "genefilter", "SSPA", "sva", "limma", "KEGGgraph", "siggenes","BiocParallel", "MSnbase", "multtest","RBGL","edgeR","fgsea","devtools","crmn")
