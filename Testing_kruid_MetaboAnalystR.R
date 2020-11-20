@@ -28,7 +28,7 @@ param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_i
 
 # Raw kruiden data inlezen
 ## Grouped data
-raw_kruiden <- ImportRawMSData(foldername = "mzxml/", mode = "onDisk", plotSettings = SetPlotParam(Plot = F))
+raw_kruiden <- ImportRawMSData(foldername = 'mzxml/', mode = "onDisk", plotSettings = SetPlotParam(Plot = F))
 
 ## Solo data
 
@@ -116,3 +116,4 @@ lapply(1:length(xchr), function(x) {
   counter <<- counter + 1
   xchr[[counter]]@chromPeakData <- as(allpeaks[[counter]], 'DFrame')
 })
+

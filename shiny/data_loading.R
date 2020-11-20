@@ -33,7 +33,7 @@ ui <- dashboardPagePlus(
     uiOutput("sidebarright"),
     title = 'Load data',
     helpText("Welcome to MetabOracle! Please upload your mzXML/mzML/netCDF data below."),
-    fileInput(inputId = "data_input", label = "Choose data file(s)"),
+    fileInput(inputId = 'data_input', label = 'okee', multiple = T, accept = c('.mzXML', 'mzxml')),
     sliderInput(inputId = 'rt.idx', label = 'rt.idx', min = 0, max = 1, step = 0.1, value = 0.6),
     radioButtons(inputId = 'inspect_trim', label = 'Inspect or Upload data.',
                  choices = list('Inspect' = 1,
@@ -49,8 +49,7 @@ ui <- dashboardPagePlus(
                 box(
                   title = 'Output',
                   tableOutput(outputId = 'file'),
-                  textOutput(outputId = 'type'),
-                  textOutput(outputId = 'test')
+                  textOutput('paths')
                   ),
                 box(
                   imageOutput(outputId = 'inspect_plot')
@@ -69,41 +68,56 @@ ui <- dashboardPagePlus(
                   actionButton(inputId = 'peakdetectrun', label = 'Perform peak detection')
                   ),
                 box(
-                  imageOutput(outputId = 'inspect_plot'),
+                  title = 'Amount of peaks:',
+                  textOutput('peakamount')
+                )
+                ),
+              fluidRow(
+                box(
                   imageOutput(outputId = 'foundpeaks')
-                ))
+                ))),
+      tabItem('peakalignment',
+              fluidRow(
+                box(
+                  title = 'Input parameters for alignment',
+                  
+                )
+              )
               )
     )
   )
 )
 
 server <- function(input, output){
+  rvalues <- reactiveValues()
+  
   output$file <- renderTable(input$data_input
   )
   
-  output$type <- renderText(input$data_input$datapath)
+  # output$fileinfo <- renderText()
+  
+  output$paths <- renderText(input$data_input$datapath)
   
   observeEvent(input$run, {
     if(input$inspect_trim == 1){
       output$inspect_plot <- renderPlot(PerformDataInspect(input$data_input$datapath))
     }
     else {
-      # oke <- input$data_input$datapath[[1]][-5]
-      # oke <- paste(oke, collapse = '/')
-      raw_data <- readMSData(files = input$data_input$datapath, mode = 'onDisk')
-      output$inspect_plot <- renderPlot(plot(chromatogram(raw_data)))
+      rvalues$raw_data <- readMSData(files = input$data_input$datapath, mode = 'onDisk')
+      output$inspect_plot <- renderPlot(plot(chromatogram(rvalues$raw_data)))
     }
   })
   
   observeEvent(input$peakdetectrun, {
     params <- SetPeakParam(platform = 'general', Peak_method = 'centWave', ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
                            snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
-    mSet <- PerformPeakPicking(raw_data, updateRawSpectraParam(params))
+    mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
+    output$peakamount <- renderText(mSet[["msFeatureData"]][["chromPeakData"]]@nrows)
     chr <- chromatogram(mSet[['onDiskData']])
     xchr <- as(chr, 'XChromatograms')
     xchr[[1]]@chromPeaks <- mSet[["msFeatureData"]][["chromPeaks"]]
     xchr[[1]]@chromPeakData <- mSet[["msFeatureData"]][["chromPeakData"]]
-    output$foundpeaks <- renderPlot(plot(xchr))
+    output$foundpeaks <- renderPlot(plot(xchr[[1]]))
   })
 }
 
