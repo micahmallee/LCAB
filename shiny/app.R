@@ -1,9 +1,9 @@
 library(shiny)
 library(MetaboAnalystR)
-library(shinyFiles)
-library(bs4Dash)
 library(shinydashboard)
 library(shinydashboardPlus)
+library(xcms)
+library(magrittr)
 
 options(shiny.maxRequestSize=100*1024^2)
 
