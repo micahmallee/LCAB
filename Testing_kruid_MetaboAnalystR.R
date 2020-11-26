@@ -28,7 +28,7 @@ param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_i
 
 # Raw kruiden data inlezen
 ## Grouped data
-raw_kruiden <- ImportRawMSData(foldername = 'mzxml/', mode = "onDisk", plotSettings = SetPlotParam(Plot = F))
+raw_kruiden_grouped <- ImportRawMSData(foldername = 'mzxml/', mode = "onDisk", plotSettings = SetPlotParam(Plot = F))
 
 ## Solo data
 
@@ -67,12 +67,18 @@ param_optimized <- PerformParamsOptimization(raw_data = raw_peper, param = param
 smSet <- PerformPeakPicking(raw_peper, param = updateRawSpectraParam(param_optimized))
 # smSet <- PerformPeakAlignment(smSet, param = updateRawSpectraParam(param_optimized))
 smSet <- MetaboAnalystR:::PerformPeakGrouping(smSet, param = updateRawSpectraParam(param_optimized))
-smSet <- PerformPeakFiling(smSet, param = updateRawSpectraParam(param_optimized))
-
+# smSet <- PerformPeakFiling(smSet, param = updateRawSpectraParam(param_optimized))
 annotPeaks_solo <- PerformPeakAnnotation(mSet = smSet, annotaParam = annParams2)
 
-kijk <- MetaboAnalystR::PerformPeakAlignment(mSet = smSet, param = updateRawSpectraParam(param_optimized))
-
+# Two samples:
+raw_pepers <- readMSData(files = c('mzxml/Kruid_130/Kruid 130 Zwarte peper 5 191119me_70.mzXML', 'mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML', 'kruiden/Kruid 132 Zwarte peper 7 191119me_72.mzXML'), mode = 'onDisk')
+param_optimized2 <- PerformParamsOptimization(raw_data = raw_pepers, param = param_initial, ncore = 8)
+smSet <- PerformPeakPicking(raw_pepers, param = updateRawSpectraParam(param_optimized))
+smSet[["onDiskData"]]@phenoData@data[["sample_name"]] <- smSet[["onDiskData"]]@phenoData@data[["sampleNames"]]
+smSet[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
+smSet <- PerformPeakAlignment(smSet, param = updateRawSpectraParam(param_optimized))
+smSet <- PerformPeakFiling(smSet, param = updateRawSpectraParam(param_optimized))
+annotPeaks <- PerformPeakAnnotation(mSet = smSet, annotaParam = annParams2)
 
 param_optimized <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', mzdiff = 0,
                                 snthresh = 10, bw = 2, ppm = 22.35, min_peakwidth = 3, max_peakwidth = 37.5, 
