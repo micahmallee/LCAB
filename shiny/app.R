@@ -4,7 +4,7 @@ library(shinydashboard)
 library(shinydashboardPlus)
 library(xcms)
 library(magrittr)
-library(shinythemes)
+#library(shinythemes)
 library(shinycssloaders)
 library(shinyBS)
 
@@ -78,7 +78,7 @@ ui <- dashboardPagePlus(
                 box(width = 2,
                   title = 'Input parameters for peak picking',
                   numericInput(inputId = 'ppm', label = 'ppm', value = NA, min = 0),
-                  bsTooltip(id = 'ppm', title = 'This is an input', placement = 'left', trigger = 'hover'),
+                  bsTooltip(id = 'ppm', title = 'Maximum mass deviation', placement = 'left', trigger = 'hover'),
                   numericInput(inputId = 'noise', label = 'Noise', value = 1000, min = 0),
                   numericInput(inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = 5, min = 0),
                   numericInput(inputId = 'max_peakwidth', label = 'Maximum peakwidth', value = 20, min = 0),
