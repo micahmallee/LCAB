@@ -4,28 +4,23 @@ library(shinydashboard)
 library(shinydashboardPlus)
 library(xcms)
 library(magrittr)
-#library(shinythemes)
 library(shinycssloaders)
 library(shinyBS)
+library(shinyjs)
 
 options(shiny.maxRequestSize=100*1024^2)
 
 # Define UI
 ui <- dashboardPagePlus(
   skin = 'midnight',
-  dashboardHeaderPlus(
+  header = dashboardHeaderPlus(
     title = tagList(
       tags$span(
         class = "logo-lg", "MetabOracle"
       )
     )
-    # ,
-    # left_menu = tagList(uiOutput("admincontrol")),
-    # enable_rightsidebar = TRUE,
-    # rightSidebarIcon = "file-upload",
-    # userOutput("usertop")
   ),
-  dashboardSidebar(
+  sidebar = dashboardSidebar(
     collapsed = T, 
     width = 340,
     sidebarMenu(collapsed = T,
@@ -36,21 +31,9 @@ ui <- dashboardPagePlus(
       menuItem('Statistical analysis', tabName = 'statistics', icon = icon('align-center'))
     )
   ),
-  
-  # rightsidebar = rightSidebar(collapsed = FALSE,
-  #   uiOutput("sidebarright"),
-  #   title = 'Load data',
-  #   helpText("Welcome to MetabOracle! Please upload your mzXML/mzML/netCDF data below."),
-  #   fileInput(inputId = 'data_input', label = 'okee', multiple = T, accept = c('.mzXML', 'mzxml')),
-  #   sliderInput(inputId = 'rt.idx', label = 'rt.idx', min = 0, max = 1, step = 0.1, value = 0.6),
-  #   radioButtons(inputId = 'inspect_trim', label = 'Inspect or Upload data.',
-  #                choices = list('Inspect' = 1,
-  #                               'Upload' = 2),
-  #                selected = 1, inline = T),
-  #   actionButton(inputId = 'run', label = 'Run')
-  # ),
-  
-  dashboardBody(
+    
+  body = dashboardBody(
+    useShinyjs(),
     tabItems(
       tabItem('dashboard', 
               fluidRow(
@@ -88,27 +71,34 @@ ui <- dashboardPagePlus(
                   actionButton(inputId = 'peakdetectrun', label = 'Perform peak detection'),
                   actionButton(inputId = 'paramdetectrun', label = 'Detect parameters automatically')
                   ),
-                box(width = 2,
-                  title = 'Input parameters for peak alignment',
-                  selectInput(inputId = 'rtmethod', label = 'Method', choices = list('loess' = 1, 'obiwarp' = 2),selected = 1),
-                  # Grouping:
-                  numericInput(inputId = 'bw', label = 'Bandwith', value = 10, min = 1),
-                  numericInput(inputId = 'min_fraction', label = 'minFraction', value = 0.5, min = 0),
-                  numericInput(inputId = 'min_samples', label = 'minSamples', value = 1, min = 1),
-                  selectInput(inputId = 'fitgauss', label = 'Fitgauss', choices = list('False' = 1, 'True' = 2),selected = 1),
-                  selectInput(inputId = 'verbose_columns', label = 'Verbose columns', choices = list('False' = 1, 'True' = 2),selected = 1),
-                  numericInput(inputId = 'integrate', label = 'Integrate', value = 1, min = 0, max = 1),
-                  numericInput(inputId = 'span', label = 'Span', value = 0.25, min = 0),
-                  numericInput(inputId = 'max_features', label = 'maxFeatures', value = 100, min = 0),
-                  numericInput(inputId = 'extra', label = 'Extra', value = 1, min = 0),
-                  # obiwarp
-                  numericInput(inputId = 'prof_step', label = 'profStep', value = 100, min = 0)
+                div(id = 'align_param_box',
+                    box(width = 2,
+                        title = 'Input parameters for peak alignment',
+                        selectInput(inputId = 'rtmethod', label = 'Method', choices = list('loess' = 'loess', 'obiwarp' = 'obiwarp'),selected = 'loess'),
+                        # loess
+                        div(id = 'loessparams',
+                            numericInput(inputId = 'extra', label = 'Extra', value = 1, min = 0),
+                            numericInput(inputId = 'span', label = 'Span', value = 0.25, min = 0)),
+                        # obiwarp
+                        div(id = 'obiwarpparams',
+                            numericInput(inputId = 'prof_step', label = 'profStep', value = 100, min = 0)),
+                        # Grouping:
+                        numericInput(inputId = 'bw', label = 'Bandwith', value = 10, min = 1),
+                        numericInput(inputId = 'min_fraction', label = 'minFraction', value = 0.5, min = 0),
+                        numericInput(inputId = 'min_samples', label = 'minSamples', value = 1, min = 1),
+                        selectInput(inputId = 'fitgauss', label = 'Fitgauss', choices = list('False' = 'FALSE', 'True' = 'TRUE'),selected = 'FALSE'),
+                        selectInput(inputId = 'verbose_columns', label = 'Verbose columns', choices = list('False' = 'FALSE', 'True' = 'TRUE'),selected = 'FALSE'),
+                        numericInput(inputId = 'integrate', label = 'Integrate', value = 1, min = 0, max = 1),
+                        numericInput(inputId = 'max_features', label = 'maxFeatures', value = 100, min = 0)
+                    )
                 ),
                 box(width = 2,
-                  title = 'Other params'
+                  title = 'Upload or save parameters',
+                  downloadButton(outputId = 'save_params', label = 'Save parameters'),
+                  fileInput(inputId = 'upload_params', label = 'Upload parameters:', multiple = F, accept = '.RData')
                 ),
                 box(
-                  width = 6,
+                  # width = 6,
                   title = 'Results', 
                   textOutput(outputId = 'peakamount'),
                   imageOutput(outputId = 'foundpeaks')
@@ -117,22 +107,22 @@ ui <- dashboardPagePlus(
       tabItem('clustering',
               fluidRow(
                 box(
-                  title = 'Clustertabitem',
-                  
+                  title = 'Clustertabitem'
+
                 )
               )),
       tabItem('statistics',
               fluidRow(
                 box(
-                  title = 'Statistical analysis tabitem',
-                  
+                  title = 'Statistical analysis tabitem'
+
                 )
               )),
       tabItem('msea',
               fluidRow(
                 box(
-                  title = 'MSEA tabitem',
-                  
+                  title = 'MSEA tabitem'
+
                 )
               ))
     )
@@ -145,6 +135,43 @@ ui <- dashboardPagePlus(
 
 server <- function(input, output, session){
   rvalues <- reactiveValues()
+
+  
+  rvalues$parameters <- reactive({
+    # req(input$upload_params)
+    param_file <- input$upload_params 
+    if (is.null(param_file)) {
+      param_initial <- SetPeakParam('general', RT_method = 'loess')
+    } else {
+      load(input$upload_params$datapath)
+    }
+    param_initial
+  })
+  
+
+  
+  observe({
+    rvalues$param_initial <- rvalues$parameters()
+    print(rvalues$param_initial$RT_method)
+    updateNumericInput(session = session, inputId = 'ppm', label = 'ppm', value = rvalues$param_initial$ppm, min = 0)
+    updateNumericInput(session = session, inputId = 'noise', label = 'Noise', value = rvalues$param_initial$noise, min = 0)
+    updateNumericInput(session = session, inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = rvalues$param_initial$min_peakwidth, min = 0)
+    updateNumericInput(session = session, inputId = 'max_peakwidth', label = 'Maximum peakwidth', value = rvalues$param_initial$max_peakwidth, min = 0)
+    updateNumericInput(session = session, inputId = 'snthresh', label = 'Signal to noise threshold', value = rvalues$param_initial$snthresh, min = 0)
+    updateNumericInput(session = session, inputId = 'prefilter', label = 'Prefilter', value = rvalues$param_initial$prefilter, min = 0)
+    updateNumericInput(session = session, inputId = 'v_prefilter', label = 'Value of prefilter', value = rvalues$param_initial$value_of_prefilter, min = 0)
+    updateSelectInput(session, inputId = 'rtmethod', label = 'Method', choices = list('loess' = 'loess', 'obiwarp' = 'obiwarp'),selected = rvalues$param_initial$RT_method)
+    updateNumericInput(session, inputId = 'bw', label = 'Bandwith', value = rvalues$param_initial$bw, min = 1)
+    updateNumericInput(session, inputId = 'min_fraction', label = 'minFraction', value = rvalues$param_initial$minFraction, min = 0)
+    updateNumericInput(session, inputId = 'min_samples', label = 'minSamples', value = rvalues$param_initial$minSamples, min = 1)
+    updateSelectInput(session, inputId = 'fitgauss', label = 'Fitgauss', choices = list('False' = 'FALSE', 'True' = 'TRUE'), selected = rvalues$param_initial$fitgauss)
+    updateSelectInput(session, inputId = 'verbose_columns', label = 'Verbose columns', choices = list('False' = 'FALSE', 'True' = 'TRUE'), selected = rvalues$param_initial$verbose.columns)
+    updateNumericInput(session, inputId = 'integrate', label = 'Integrate', value = rvalues$param_initial$integrate, min = 0, max = 1)
+    updateNumericInput(session, inputId = 'span', label = 'Span', value = rvalues$param_initial$span, min = 0)
+    updateNumericInput(session, inputId = 'max_features', label = 'maxFeatures', value = rvalues$param_initial$maxFeatures, min = 0)
+    updateNumericInput(session, inputId = 'extra', label = 'Extra', value = rvalues$param_initial$extra, min = 0)
+    updateNumericInput(session, inputId = 'prof_step', label = 'profStep', value = rvalues$param_initial$prof_step, min = 0)
+  })
   
   output$file <- renderTable(input$data_input
   )
@@ -160,6 +187,22 @@ server <- function(input, output, session){
       output$inspect_plot <- renderPlot(plot(chromatogram(rvalues$raw_data)))
       }
     })
+  
+  observe({
+    if (length(input$data_input$datapath) >= 0) {
+      shinyjs::show(id = 'align_param_box')
+    } else {
+      shinyjs::hide(id = 'align_param_box')
+    }
+    
+    if (input$rtmethod == 'loess') {
+      shinyjs::show(id = 'loessparams')
+      shinyjs::hide(id = 'obiwarpparams')
+    } else if (input$rtmethod == 'obiwarp') {
+      shinyjs::hide(id = 'loessparams')
+      shinyjs::show(id = 'obiwarpparams')
+    }
+  })
   
   observeEvent(input$peakdetectrun, {
     params <- SetPeakParam(platform = 'general', Peak_method = 'centWave', ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
@@ -189,7 +232,7 @@ server <- function(input, output, session){
   })
   
   observeEvent(input$paramdetectrun, {
-    param_initial <- SetPeakParam(platform = 'general', Peak_method = 'centWave', ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
+    param_initial <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
                                 snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
     rvalues$optimized_params <- PerformParamsOptimization(raw_data = subset_raw_data, param = param_initial, ncore = 8)
     updateNumericInput(session = session, inputId = 'ppm', label = 'ppm', value = rvalues$optimized_params$best_parameters$ppm , min = 0)
@@ -200,6 +243,17 @@ server <- function(input, output, session){
     updateNumericInput(session = session, inputId = 'prefilter', label = 'Prefilter', value = rvalues$optimized_params$best_parameters$prefilter, min = 0)
     updateNumericInput(session = session, inputId = 'v_prefilter', label = 'Value of prefilter', value = rvalues$optimized_params$best_parameters$value_of_prefilter, min = 0)
   })
+  
+  output$save_params <- downloadHandler(
+    filename = function() {
+      paste('params_', Sys.Date(), '.RData', sep = '')
+    },
+    content = function(file) {
+      param_initial <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = input$rtmethod, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
+                                            snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
+      save(param_initial, file = file)
+    }
+  )
 }
 
 shinyApp(ui, server)

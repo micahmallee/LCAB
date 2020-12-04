@@ -72,17 +72,15 @@ annotPeaks_solo <- PerformPeakAnnotation(mSet = smSet, annotaParam = annParams2)
 
 # Two samples:
 raw_pepers <- readMSData(files = c('mzxml/Kruid_130/Kruid 130 Zwarte peper 5 191119me_70.mzXML', 'mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML', 'kruiden/Kruid 132 Zwarte peper 7 191119me_72.mzXML'), mode = 'onDisk')
-raw_pepers@phenoData@data[["sample_name"]] <- raw_pepers@phenoData@data[["sampleNames"]]
-raw_pepers@phenoData@data[["sampleNames"]] <- NULL
 param_optimized2 <- PerformParamsOptimization(raw_data = raw_pepers, param = param_initial, ncore = 8)
-smSet <- PerformPeakPicking(raw_pepers, param = updateRawSpectraParam(param_optimized))
+smSet <- PerformPeakPicking(raw_pepers, param = updateRawSpectraParam(param_optimized2))
 smSet[["onDiskData"]]@phenoData@data[["sample_name"]] <- smSet[["onDiskData"]]@phenoData@data[["sampleNames"]]
 smSet[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
-smSet <- PerformPeakAlignment(smSet, param = updateRawSpectraParam(param_optimized))
-smSet <- PerformPeakFiling(smSet, param = updateRawSpectraParam(param_optimized))
+smSet <- PerformPeakAlignment(smSet, param = updateRawSpectraParam(param_optimized2))
+smSet <- PerformPeakFiling(smSet, param = updateRawSpectraParam(param_optimized2))
 annotPeaks <- PerformPeakAnnotation(mSet = smSet, annotaParam = annParams2)
 
-param_optimized <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', mzdiff = 0,
+param_optimized2 <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', mzdiff = 0,
                                 snthresh = 10, bw = 2, ppm = 22.35, min_peakwidth = 3, max_peakwidth = 37.5, 
                                 noise = 1000, prefilter = 2, value_of_prefilter = 0.02, minFraction = 0.5, 
                                 minSamples = 1, maxFeatures = 100, extra = 1, span = 0.25, smooth = 'loess', 
