@@ -63,11 +63,17 @@ ui <- dashboardPagePlus(
                   numericInput(inputId = 'ppm', label = 'ppm', value = NA, min = 0),
                   bsTooltip(id = 'ppm', title = 'Maximum mass deviation', placement = 'left', trigger = 'hover'),
                   numericInput(inputId = 'noise', label = 'Noise', value = 1000, min = 0),
+                  bsTooltip(id = 'noise', title = 'Noise value', placement = 'left', trigger = 'hover'),
                   numericInput(inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = 5, min = 0),
+                  bsTooltip(id = 'min_peakwidth', title = 'Minimum peak width in seconds', placement = 'left', trigger = 'hover'),
                   numericInput(inputId = 'max_peakwidth', label = 'Maximum peakwidth', value = 20, min = 0),
+                  bsTooltip(id = 'max_peakwidth', title = 'Maximum peak width in seconds', placement = 'left', trigger = 'hover'),
                   numericInput(inputId = 'snthresh', label = 'Signal to noise threshold', value = 10, min = 0),
+                  bsTooltip(id = 'snthresh', title = 'Signal to noise ratio cut-off', placement = 'left', trigger = 'hover'),
                   numericInput(inputId = 'prefilter', label = 'Prefilter', value = 3, min = 0),
+                  bsTooltip(id = 'prefilter', title = 'Prefilter', placement = 'left', trigger = 'hover'),
                   numericInput(inputId = 'v_prefilter', label = 'Value of prefilter', value = 100, min = 0),
+                  bsTooltip(id = 'v_prefilter', title = 'Value of prefilter', placement = 'left', trigger = 'hover'),
                   actionButton(inputId = 'peakdetectrun', label = 'Perform peak detection'),
                   actionButton(inputId = 'paramdetectrun', label = 'Detect parameters automatically')
                   ),
@@ -78,18 +84,28 @@ ui <- dashboardPagePlus(
                         # loess
                         div(id = 'loessparams',
                             numericInput(inputId = 'extra', label = 'Extra', value = 1, min = 0),
-                            numericInput(inputId = 'span', label = 'Span', value = 0.25, min = 0)),
+                            bsTooltip(id = 'extra', title = 'Extra', placement = 'left', trigger = 'hover'),
+                            numericInput(inputId = 'span', label = 'Span', value = 0.25, min = 0),
+                            bsTooltip(id = 'span', title = 'Span', placement = 'left', trigger = 'hover')),
                         # obiwarp
                         div(id = 'obiwarpparams',
-                            numericInput(inputId = 'prof_step', label = 'profStep', value = 100, min = 0)),
+                            numericInput(inputId = 'prof_step', label = 'profStep', value = 100, min = 0),
+                            bsTooltip(id = 'prof_step', title = 'Prof step', placement = 'left', trigger = 'hover')),
                         # Grouping:
                         numericInput(inputId = 'bw', label = 'Bandwith', value = 10, min = 1),
+                        bsTooltip(id = 'bw', title = 'Bandwith', placement = 'left', trigger = 'hover'),
                         numericInput(inputId = 'min_fraction', label = 'minFraction', value = 0.5, min = 0),
+                        bsTooltip(id = 'min_fraction', title = 'Minimal fraction of samples a feature has to be present in', placement = 'left', trigger = 'hover'),
                         numericInput(inputId = 'min_samples', label = 'minSamples', value = 1, min = 1),
+                        bsTooltip(id = 'min_samples', title = 'Minimum amount of samples a feature has to be present in', placement = 'left', trigger = 'hover'),
                         selectInput(inputId = 'fitgauss', label = 'Fitgauss', choices = list('False' = 'FALSE', 'True' = 'TRUE'),selected = 'FALSE'),
+                        bsTooltip(id = 'fitgauss', title = 'Fitgauss', placement = 'left', trigger = 'hover'),
                         selectInput(inputId = 'verbose_columns', label = 'Verbose columns', choices = list('False' = 'FALSE', 'True' = 'TRUE'),selected = 'FALSE'),
+                        bsTooltip(id = 'verbose_columns', title = 'Verbose columns', placement = 'left', trigger = 'hover'),
                         numericInput(inputId = 'integrate', label = 'Integrate', value = 1, min = 0, max = 1),
-                        numericInput(inputId = 'max_features', label = 'maxFeatures', value = 100, min = 0)
+                        bsTooltip(id = 'integrate', title = 'Integrate', placement = 'left', trigger = 'hover'),
+                        numericInput(inputId = 'max_features', label = 'maxFeatures', value = 100, min = 0),
+                        bsTooltip(id = 'max_features', title = 'Maximum amount of features', placement = 'left', trigger = 'hover')
                     )
                 ),
                 box(width = 2,
@@ -173,8 +189,7 @@ server <- function(input, output, session){
     updateNumericInput(session, inputId = 'prof_step', label = 'profStep', value = rvalues$param_initial$prof_step, min = 0)
   })
   
-  output$file <- renderTable(input$data_input
-  )
+  output$file <- renderTable(input$data_input)
   
   output$paths <- renderText(length(input$data_input$datapath))
   

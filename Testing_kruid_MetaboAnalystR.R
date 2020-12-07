@@ -25,6 +25,7 @@ param_initial <- SetPeakParam(platform = "general", snthresh = 10)
 
 # Door middel van trimmed kruiden data de parameters optimaliseren
 param_optimized <- PerformParamsOptimization(raw_data = kruiden, param = param_initial)
+param_optimized <- PerformParamsOptimization(raw_data = raw_kruiden_grouped, param = param_initial)
 
 # Raw kruiden data inlezen
 ## Grouped data
@@ -123,4 +124,7 @@ lapply(1:length(xchr), function(x) {
   counter <<- counter + 1
   xchr[[counter]]@chromPeakData <- as(allpeaks[[counter]], 'DFrame')
 })
+
+
+
 
