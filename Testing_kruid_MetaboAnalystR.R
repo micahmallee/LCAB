@@ -124,3 +124,6 @@ lapply(1:length(xchr), function(x) {
   xchr[[counter]]@chromPeakData <- as(allpeaks[[counter]], 'DFrame')
 })
 
+
+
+
