@@ -88,43 +88,18 @@ param_optimized2 <- SetPeakParam(platform = 'general', Peak_method = 'centWave',
                                 family = 'gaussian', verbose.columns = FALSE, fitgauss = FALSE, integrate = 1, 
                                 mzCenterFun = "wMean")
 
-chr <- chromatogram(smSet[['onDiskData']])
-xchr <- as(chr, 'XChromatograms')
-xchr[[1]]@chromPeaks <- smSet[["msFeatureData"]][["chromPeaks"]]
-xchr[[1]]@chromPeakData <- smSet[["msFeatureData"]][["chromPeakData"]]
-plot(xchr)
-
-# Plot found peaks for one sample:
-plotMARPeaks <- function(mSet) {
-  nSamples <- length(seq_along(mSet[["onDiskData"]]@phenoData@data[["sample_name"]]))
+# Create function which makes a plotable xchromatogram object per sample with their respective found peaks
+create_xchr <- function(mSet) {
   chr <- chromatogram(mSet[['onDiskData']])
   xchr <- as(chr, 'XChromatograms')
-  allpeaks <- xchr$msFeatureData$chromPeaks
-  allpeaks <- as.data.frame(allpeaks)
-  allpeaks <- split(allpeaks, allpeaks$sample)
-  lapply(xchr, function(z){
-    xchr[[z]]@chromPeaks <- 
-    z@chromPeakData <- as(allpeaks[[z]], 'DFrame')
-  })
-  res <- lapply(xchr, function(z) {
-    xchr[[z]]@chromPeaks <- mSet[["msFeatureData"]][["chromPeaks"]]
-    xchr[[z]]@chromPeakData <- mSet[["msFeatureData"]][["chromPeakData"]]
-  })
-  return(res)
-}
-
-assa <- function(mSet, x) {
-  xchr[[x]]@chromPeaks <- mSet[["msFeatureData"]][["chromPeaks"]]
-  xchr[[x]]@chromPeakData <- mSet[["msFeatureData"]][["chromPeakData"]]
+  chrompks <- mSet[["msFeatureData"]][["chromPeaks"]]
+  chrompkd <- mSet[["msFeatureData"]][["chromPeakData"]]
+  samples <- factor(chrompks[, "sample"], levels = 1:length(fileNames(mSet$onDiskData)))
+  chrompks <- split.data.frame(chrompks, smpls)
+  chrompkd <- split.data.frame(chrompkd, smpls)
+  for (i in range(length(xchr))) {
+    xchr[[i]]@chromPeaks <- chrompks[[i]]
+    xchr[[i]]@chromPeakData <- chrompkd[[i]]
+  }
   return(xchr)
 }
-
-counter <- 0
-lapply(1:length(xchr), function(x) {
-  counter <<- counter + 1
-  xchr[[counter]]@chromPeakData <- as(allpeaks[[counter]], 'DFrame')
-})
-
-
-
-

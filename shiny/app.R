@@ -239,10 +239,21 @@ server <- function(input, output, session){
       mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(param_optimized))
     }
     output$peakamount <- renderText(mSet[["msFeatureData"]][["chromPeakData"]]@nrows)
-    chr <- chromatogram(mSet[['onDiskData']])
-    xchr <- as(chr, 'XChromatograms')
-    xchr[[1]]@chromPeaks <- mSet[["msFeatureData"]][["chromPeaks"]]
-    xchr[[1]]@chromPeakData <- mSet[["msFeatureData"]][["chromPeakData"]]
+    create_xchr <- function(mSet) {
+      chr <- chromatogram(mSet[['onDiskData']])
+      xchr <- as(chr, 'XChromatograms')
+      chrompks <- mSet[["msFeatureData"]][["chromPeaks"]]
+      chrompkd <- mSet[["msFeatureData"]][["chromPeakData"]]
+      samples <- factor(chrompks[, "sample"], levels = 1:length(fileNames(mSet$onDiskData)))
+      chrompks <- split.data.frame(chrompks, samples)
+      chrompkd <- split.data.frame(chrompkd, samples)
+      for (i in 1:length(xchr)) {
+        xchr[[i]]@chromPeaks <- chrompks[[i]]
+        xchr[[i]]@chromPeakData <- chrompkd[[i]]
+      }
+      return(xchr)
+    }
+    xchr <- create_xchr(mSet)
     output$foundpeaks <- renderPlot(plot(xchr[[1]]))
   })
   
