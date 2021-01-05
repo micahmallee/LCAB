@@ -5,7 +5,7 @@ library(MetaboAnalystR)
 library(magrittr)
 library(xcms)
 
-data <- readMSData(c('mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML', 'mzxml/Kruid_130/Kruid 130 Zwarte peper 5 191119me_70.mzXML'), mode = 'onDisk')
+data <- readMSData(c('mzxml/KRUID_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML', 'mzxml/KRUID_126/Kruid 126 Zwarte peper 1 191119me_66.mzXML'), mode = 'onDisk')
 param_optimized2 <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', mzdiff = 0,
                                  snthresh = 100, bw = 2, ppm = 22.35, min_peakwidth = 3, max_peakwidth = 37.5, 
                                  noise = 0, prefilter = 2, value_of_prefilter = 0.02, minFraction = 0.5, 
@@ -70,8 +70,8 @@ fig <- plot_ly(x =  xchr[[1]]@rtime, y = xchr[[1]]@intensity, type = 'scatter', 
 fig <- plot_ly(x =  smSet$onDiskData@featureData@data$retentionTime, y = smSet$onDiskData@featureData@data$basePeakIntensity, type = 'scatter', mode = 'lines', name = 'rt 1')
 fig <- fig %>% add_trace(x =  smSet$xcmsSet@rt$raw, y = smSet$onDiskData@featureData@data$basePeakIntensity, type = 'scatter', mode = 'lines', name = 'rt raw2')
 fig <- fig %>% add_trace(x =  smSet[["xcmsSet"]]@rt[["corrected"]][["1"]], y = smSet$onDiskData@featureData@data$basePeakIntensity, type = 'scatter', mode = 'lines', name = 'rt corrected1')
-fig <- fig %>% add_trace(x =  xchr[[1]]@chromPeaks[,4], y = xchr[[1]]@chromPeaks[,9], type = 'scatter', mode = 'markers+lines', name = 'Sample 1')
-fig <- fig %>% add_trace(x =  xchr[[2]]@chromPeaks[,4], y = xchr[[2]]@chromPeaks[,9], type = 'scatter', mode = 'markers+lines', name = 'Sample 2')
+fig <- fig %>% add_trace(x =  xchr[[1]]@chromPeaks[,4], y = xchr[[1]]@chromPeaks[,9], type = 'scatter', mode = 'markers', name = 'Sample 1')
+fig <- fig %>% add_trace(x =  xchr[[2]]@chromPeaks[,4], y = xchr[[2]]@chromPeaks[,9], type = 'scatter', mode = 'markers', name = 'Sample 2')
 fig
 
 fig <- plot_ly(x = smSet$msFeatureData$chromPeaks[,4], y = smSet$msFeatureData$chromPeaks[,9], type = 'scatter', mode = 'markers', name = 'foundpeaks', text = smSet$msFeatureData$chromPeaks[,1], hoverinfo = 'text')

@@ -19,6 +19,8 @@ metanr_packages <- function(){
 
 # Eerst data trimmen/inlezen om daarmee later de parameters te bepalen (samples in 1 folder)
 kruiden <- PerformDataTrimming("mzxml/", rt.idx = 1)
+kruiden2 <- PerformDataTrimming(datapath = c('mzxml/KRUID_126/Kruid 126 Zwarte peper 1 191119me_66.mzXML',
+                                  'mzxml/KRUID_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML'), rt.idx = 1)
 
 # Standaard parameters vaststellen
 param_initial <- SetPeakParam(platform = "general", snthresh = 10)
