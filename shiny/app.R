@@ -7,6 +7,8 @@ library(magrittr)
 library(shinycssloaders)
 library(shinyBS)
 library(shinyjs)
+library(DT)
+library(crosstalk)
 
 options(shiny.maxRequestSize=100*1024^2)
 
@@ -45,7 +47,7 @@ ui <- dashboardPagePlus(
                   radioButtons(inputId = 'inspect_trim', label = 'Inspect or upload data.',
                                choices = list('Inspect' = 1,
                                               'Upload' = 2),
-                               selected = 1, inline = T),
+                               selected = 2, inline = T),
                   actionButton(inputId = 'run', label = 'Run')
                 ),
                 box(
@@ -114,10 +116,15 @@ ui <- dashboardPagePlus(
                   fileInput(inputId = 'upload_params', label = 'Upload parameters:', multiple = F, accept = '.RData')
                 ),
                 box(
-                  # width = 6,
+                  width = 6,
                   title = 'Results', 
                   textOutput(outputId = 'peakamount'),
-                  imageOutput(outputId = 'foundpeaks')
+                  plotlyOutput(outputId = 'foundpeaks')
+                ),
+                box(
+                  title = 'Selected peaks',
+                  verbatimTextOutput(outputId = 'vsp'),
+                  plotlyOutput('mzplot')
                 )
                 )),
       tabItem('clustering',
@@ -168,7 +175,6 @@ server <- function(input, output, session){
   
   observe({
     rvalues$param_initial <- rvalues$parameters()
-    print(rvalues$param_initial$RT_method)
     updateNumericInput(session = session, inputId = 'ppm', label = 'ppm', value = rvalues$param_initial$ppm, min = 0)
     updateNumericInput(session = session, inputId = 'noise', label = 'Noise', value = rvalues$param_initial$noise, min = 0)
     updateNumericInput(session = session, inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = rvalues$param_initial$min_peakwidth, min = 0)
@@ -204,7 +210,7 @@ server <- function(input, output, session){
     })
   
   observe({
-    if (length(input$data_input$datapath) >= 0) {
+    if (length(input$data_input$datapath) > 1) {
       shinyjs::show(id = 'align_param_box')
     } else {
       shinyjs::hide(id = 'align_param_box')
@@ -238,23 +244,53 @@ server <- function(input, output, session){
       mSet <- PerformPeakAlignment(mSet, param = updateRawSpectraParam(param_optimized))
       mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(param_optimized))
     }
-    output$peakamount <- renderText(mSet[["msFeatureData"]][["chromPeakData"]]@nrows)
+    rvalues$mSet <- mSet
+    output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
     create_xchr <- function(mSet) {
       chr <- chromatogram(mSet[['onDiskData']])
       xchr <- as(chr, 'XChromatograms')
       chrompks <- mSet[["msFeatureData"]][["chromPeaks"]]
       chrompkd <- mSet[["msFeatureData"]][["chromPeakData"]]
+      rt <- mSet[["msFeatureData"]][["adjustedRT"]]
       samples <- factor(chrompks[, "sample"], levels = 1:length(fileNames(mSet$onDiskData)))
       chrompks <- split.data.frame(chrompks, samples)
       chrompkd <- split.data.frame(chrompkd, samples)
-      for (i in 1:length(xchr)) {
-        xchr[[i]]@chromPeaks <- chrompks[[i]]
-        xchr[[i]]@chromPeakData <- chrompkd[[i]]
+      if (length(xchr) > 1) {
+        for (i in 1:length(xchr)) {
+          xchr[[i]]@rtime <- rt[[i]]
+          xchr[[i]]@chromPeaks <- chrompks[[i]]
+          xchr[[i]]@chromPeakData <- chrompkd[[i]]
+        }
+      } else {
+        for (i in 1:length(xchr)) {
+          xchr[[i]]@chromPeaks <- chrompks[[i]]
+          xchr[[i]]@chromPeakData <- chrompkd[[i]]
+        }
       }
       return(xchr)
     }
     xchr <- create_xchr(mSet)
-    output$foundpeaks <- renderPlot(plot(xchr[[1]]))
+    sd <- SharedData$new(xchr)
+    p <- plot_ly(x =  sd$origData()[[1]]@rtime, y = sd$origData()[[1]]@intensity, type = 'scatter', mode = 'lines', name = 'intensities', source = 'peakplot')
+    for (i in 1:length(sd$origData())) {
+      p <- p %>% add_trace(x =  sd$origData()[[i]]@chromPeaks[,4], y = sd$origData()[[1]]@chromPeaks[,9], 
+                           type = 'bar', name = paste0('Sample ', i), text = sd$origData()[[i]]@chromPeaks[,1], 
+                           hoverinfo = 'text') %>% highlight('plotly_selected', dynamic = TRUE)
+    }
+    output$foundpeaks <- renderPlotly(p)
+  })
+  
+  observe({
+    tmp <- event_data(event = "plotly_selected", priority = "event", source = 'peakplot')
+    output$vsp <- renderPrint({
+      tmp
+      tmp$x
+    })
+    output$mzplot <- renderPlot({
+      mz <- rvalues$mSet$msFeatureData$chromPeaks[which(mSet$msFeatureData$chromPeaks[, 'rt'] == as.numeric(tmp$x)), 1]
+      rt <- rvalues$mSet$msFeatureData$chromPeaks[which(mSet$msFeatureData$chromPeaks[, 'rt'] == as.numeric(tmp$x)), 4]
+      filterRt(rvalues$mSet[["onDiskData"]], c(rt - 1, rt + 1)) %>% filterMz(rvalues$mSet[["onDiskData"]], c(mz - 1, mz + 1)) %>% plot()
+    })
   })
   
   observeEvent(input$paramdetectrun, {
