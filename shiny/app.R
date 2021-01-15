@@ -9,10 +9,13 @@ library(shinyBS)
 library(shinyjs)
 library(DT)
 library(crosstalk)
+library(plotly)
 
+# Increase max upload size to 100 MB
 options(shiny.maxRequestSize=100*1024^2)
 
-# Define UI
+# Define UI.
+# The front end of the webapp is created here.
 ui <- dashboardPagePlus(
   skin = 'midnight',
   header = dashboardHeaderPlus(
@@ -22,6 +25,7 @@ ui <- dashboardPagePlus(
       )
     )
   ),
+  # sidenavbar
   sidebar = dashboardSidebar(
     collapsed = T, 
     width = 340,
@@ -33,7 +37,7 @@ ui <- dashboardPagePlus(
       menuItem('Statistical analysis', tabName = 'statistics', icon = icon('align-center'))
     )
   ),
-    
+  # Main content
   body = dashboardBody(
     useShinyjs(),
     tabItems(
@@ -63,17 +67,19 @@ ui <- dashboardPagePlus(
                 box(width = 2,
                   title = 'Input parameters for peak picking',
                   numericInput(inputId = 'ppm', label = 'ppm', value = NA, min = 0),
-                  bsTooltip(id = 'ppm', title = 'Maximum mass deviation', placement = 'left', trigger = 'hover'),
+                  bsTooltip(id = 'ppm', title = 'Maximum tolerated fluctuation of m/z value (ppm) from scan to scan - depends on the mass spectrometer accuracy', placement = 'left', trigger = 'hover'),
                   numericInput(inputId = 'noise', label = 'Noise', value = 1000, min = 0),
-                  bsTooltip(id = 'noise', title = 'Noise value', placement = 'left', trigger = 'hover'),
+                  bsTooltip(id = 'noise', title = 'Each centroid must be greater than the "noise" intensity value', placement = 'left', trigger = 'hover'),
                   numericInput(inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = 5, min = 0),
                   bsTooltip(id = 'min_peakwidth', title = 'Minimum peak width in seconds', placement = 'left', trigger = 'hover'),
+                  numericInput(inputId = 'mz_diff', label = 'mz diff', value = 0.05, min = -0.01),
+                  bsTooltip(id = 'mz_diff', title = 'Minimum difference in m/z for peaks with overlapping retention times, can be negative to allow overlap', placement = 'left', trigger = 'hover'),
                   numericInput(inputId = 'max_peakwidth', label = 'Maximum peakwidth', value = 20, min = 0),
                   bsTooltip(id = 'max_peakwidth', title = 'Maximum peak width in seconds', placement = 'left', trigger = 'hover'),
                   numericInput(inputId = 'snthresh', label = 'Signal to noise threshold', value = 10, min = 0),
-                  bsTooltip(id = 'snthresh', title = 'Signal to noise ratio cut-off', placement = 'left', trigger = 'hover'),
+                  bsTooltip(id = 'snthresh', title = 'Signal to noise ratio cut-off (intensity)', placement = 'left', trigger = 'hover'),
                   numericInput(inputId = 'prefilter', label = 'Prefilter', value = 3, min = 0),
-                  bsTooltip(id = 'prefilter', title = 'Prefilter', placement = 'left', trigger = 'hover'),
+                  bsTooltip(id = 'prefilter', title = 'A peak must be present in x scans with an intensity greater than the value of the prefilter', placement = 'left', trigger = 'hover'),
                   numericInput(inputId = 'v_prefilter', label = 'Value of prefilter', value = 100, min = 0),
                   bsTooltip(id = 'v_prefilter', title = 'Value of prefilter', placement = 'left', trigger = 'hover'),
                   actionButton(inputId = 'peakdetectrun', label = 'Perform peak detection'),
@@ -86,28 +92,28 @@ ui <- dashboardPagePlus(
                         # loess
                         div(id = 'loessparams',
                             numericInput(inputId = 'extra', label = 'Extra', value = 1, min = 0),
-                            bsTooltip(id = 'extra', title = 'Extra', placement = 'left', trigger = 'hover'),
+                            bsTooltip(id = 'extra', title = 'Number of "extra" peaks used to define reference peaks (or well-behaved peaks) for modeling time deviation. Number of Peaks > number of samples.', placement = 'left', trigger = 'hover'),
                             numericInput(inputId = 'span', label = 'Span', value = 0.25, min = 0),
-                            bsTooltip(id = 'span', title = 'Span', placement = 'left', trigger = 'hover')),
+                            bsTooltip(id = 'span', title = 'Degree of smoothing of the loess model. 0.2 to 1', placement = 'left', trigger = 'hover')),
                         # obiwarp
                         div(id = 'obiwarpparams',
                             numericInput(inputId = 'prof_step', label = 'profStep', value = 100, min = 0),
                             bsTooltip(id = 'prof_step', title = 'Prof step', placement = 'left', trigger = 'hover')),
                         # Grouping:
                         numericInput(inputId = 'bw', label = 'Bandwith', value = 10, min = 1),
-                        bsTooltip(id = 'bw', title = 'Bandwith', placement = 'left', trigger = 'hover'),
+                        bsTooltip(id = 'bw', title = 'Standart deviation of the gaussian metapeak that group peaks together.', placement = 'left', trigger = 'hover'),
                         numericInput(inputId = 'min_fraction', label = 'minFraction', value = 0.5, min = 0),
                         bsTooltip(id = 'min_fraction', title = 'Minimal fraction of samples a feature has to be present in', placement = 'left', trigger = 'hover'),
                         numericInput(inputId = 'min_samples', label = 'minSamples', value = 1, min = 1),
                         bsTooltip(id = 'min_samples', title = 'Minimum amount of samples a feature has to be present in', placement = 'left', trigger = 'hover'),
                         selectInput(inputId = 'fitgauss', label = 'Fitgauss', choices = list('False' = 'FALSE', 'True' = 'TRUE'),selected = 'FALSE'),
-                        bsTooltip(id = 'fitgauss', title = 'Fitgauss', placement = 'left', trigger = 'hover'),
+                        bsTooltip(id = 'fitgauss', title = 'If true, a gaussian is fitted to each peak', placement = 'left', trigger = 'hover'),
                         selectInput(inputId = 'verbose_columns', label = 'Verbose columns', choices = list('False' = 'FALSE', 'True' = 'TRUE'),selected = 'FALSE'),
-                        bsTooltip(id = 'verbose_columns', title = 'Verbose columns', placement = 'left', trigger = 'hover'),
+                        bsTooltip(id = 'verbose_columns', title = 'If true additional peak meta data columns are returned', placement = 'left', trigger = 'hover'),
                         numericInput(inputId = 'integrate', label = 'Integrate', value = 1, min = 0, max = 1),
-                        bsTooltip(id = 'integrate', title = 'Integrate', placement = 'left', trigger = 'hover'),
+                        bsTooltip(id = 'integrate', title = 'Integration method. If =1 peak limits are found through descent on the mexicanhat filtered data, if =2 the descent is done on the real data. Method 2 is very accurate but prone to noise, while method 1 is more robust to noise but less exact.', placement = 'left', trigger = 'hover'),
                         numericInput(inputId = 'max_features', label = 'maxFeatures', value = 100, min = 0),
-                        bsTooltip(id = 'max_features', title = 'Maximum amount of features', placement = 'left', trigger = 'hover')
+                        bsTooltip(id = 'max_features', title = 'Maximum number of features to be defined in one bin.', placement = 'left', trigger = 'hover')
                     )
                 ),
                 box(width = 2,
@@ -156,10 +162,12 @@ ui <- dashboardPagePlus(
   )
 )
 
+# Back end of the webapp is created here.
 server <- function(input, output, session){
+  # Create a reactive value object
   rvalues <- reactiveValues()
 
-  
+  # Dynamically set parameters
   rvalues$parameters <- reactive({
     # req(input$upload_params)
     param_file <- input$upload_params 
@@ -172,12 +180,13 @@ server <- function(input, output, session){
   })
   
 
-  
+  # Dynamically update parameters back- and front-end
   observe({
     rvalues$param_initial <- rvalues$parameters()
     updateNumericInput(session = session, inputId = 'ppm', label = 'ppm', value = rvalues$param_initial$ppm, min = 0)
     updateNumericInput(session = session, inputId = 'noise', label = 'Noise', value = rvalues$param_initial$noise, min = 0)
     updateNumericInput(session = session, inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = rvalues$param_initial$min_peakwidth, min = 0)
+    updateNumericInput(session = session, inputId = 'mz_diff', label = 'mz diff', value = rvalues$param_initial$mzdiff, min = -0.01)
     updateNumericInput(session = session, inputId = 'max_peakwidth', label = 'Maximum peakwidth', value = rvalues$param_initial$max_peakwidth, min = 0)
     updateNumericInput(session = session, inputId = 'snthresh', label = 'Signal to noise threshold', value = rvalues$param_initial$snthresh, min = 0)
     updateNumericInput(session = session, inputId = 'prefilter', label = 'Prefilter', value = rvalues$param_initial$prefilter, min = 0)
@@ -195,10 +204,12 @@ server <- function(input, output, session){
     updateNumericInput(session, inputId = 'prof_step', label = 'profStep', value = rvalues$param_initial$prof_step, min = 0)
   })
   
+  
   output$file <- renderTable(input$data_input)
   
   output$paths <- renderText(length(input$data_input$datapath))
   
+  # Run button (upload vs inspect) check radiobutton, then run accordingly
   observeEvent(input$run, {
     if(input$inspect_trim == 1){
       output$inspect_plot <- renderPlot(PerformDataInspect(input$data_input$datapath))
@@ -209,8 +220,9 @@ server <- function(input, output, session){
       }
     })
   
+  # Check amount of samples. If less than 2, do not show alignment parameters
   observe({
-    if (length(input$data_input$datapath) > 1) {
+    if (length(input$data_input$datapath) >= 0) {
       shinyjs::show(id = 'align_param_box')
     } else {
       shinyjs::hide(id = 'align_param_box')
@@ -225,8 +237,9 @@ server <- function(input, output, session){
     }
   })
   
+  # Run peakdetection
   observeEvent(input$peakdetectrun, {
-    params <- SetPeakParam(platform = 'general', Peak_method = 'centWave', ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
+    params <- SetPeakParam(platform = 'general', Peak_method = 'centWave', mzdiff = input$mz_diff, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
                            snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
     if (length(input$data_input$datapath) == 1) {
       mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))  
@@ -273,13 +286,14 @@ server <- function(input, output, session){
     sd <- SharedData$new(xchr)
     p <- plot_ly(x =  sd$origData()[[1]]@rtime, y = sd$origData()[[1]]@intensity, type = 'scatter', mode = 'lines', name = 'intensities', source = 'peakplot')
     for (i in 1:length(sd$origData())) {
-      p <- p %>% add_trace(x =  sd$origData()[[i]]@chromPeaks[,4], y = sd$origData()[[1]]@chromPeaks[,9], 
+      p <- p %>% add_trace(x =  sd$origData()[[i]]@chromPeaks[,4], y = sd$origData()[[i]]@chromPeaks[,9], 
                            type = 'bar', name = paste0('Sample ', i), text = sd$origData()[[i]]@chromPeaks[,1], 
                            hoverinfo = 'text') %>% highlight('plotly_selected', dynamic = TRUE)
     }
     output$foundpeaks <- renderPlotly(p)
   })
   
+  # plot plotly chromatogram with found peaks
   observe({
     tmp <- event_data(event = "plotly_selected", priority = "event", source = 'peakplot')
     output$vsp <- renderPrint({
@@ -293,30 +307,34 @@ server <- function(input, output, session){
     })
   })
   
+  # Run automatic parameter detection and update page with new values. NOT DONE
   observeEvent(input$paramdetectrun, {
     param_initial <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
-                                snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
+                                snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter, mzdiff = input$mz_diff)
     rvalues$optimized_params <- PerformParamsOptimization(raw_data = subset_raw_data, param = param_initial, ncore = 8)
     updateNumericInput(session = session, inputId = 'ppm', label = 'ppm', value = rvalues$optimized_params$best_parameters$ppm , min = 0)
     updateNumericInput(session = session, inputId = 'noise', label = 'Noise', value = rvalues$optimized_params$best_parameters$noise, min = 0)
     updateNumericInput(session = session, inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = rvalues$optimized_params$best_parameters$min_peakwidth, min = 0)
+    updateNumericInput(session = session, inputId = 'mz_diff', label = 'mz diff', value = rvalues$optimized_params$best_parameters$mzdiff, min = -0.01)
     updateNumericInput(session = session, inputId = 'max_peakwidth', label = 'Maximum peakwidth', value = rvalues$optimized_params$best_parameters$max_peakwidth, min = 0)
     updateNumericInput(session = session, inputId = 'snthresh', label = 'Signal to noise threshold', value = rvalues$optimized_params$best_parameters$snthresh, min = 0)
     updateNumericInput(session = session, inputId = 'prefilter', label = 'Prefilter', value = rvalues$optimized_params$best_parameters$prefilter, min = 0)
     updateNumericInput(session = session, inputId = 'v_prefilter', label = 'Value of prefilter', value = rvalues$optimized_params$best_parameters$value_of_prefilter, min = 0)
   })
   
+  # Allow upload and saving of currenct parameters for future use
   output$save_params <- downloadHandler(
     filename = function() {
       paste('params_', Sys.Date(), '.RData', sep = '')
     },
     content = function(file) {
       param_initial <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = input$rtmethod, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
-                                            snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
+                                            snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter, mzdiff = input$mz_diff)
       save(param_initial, file = file)
     }
   )
 }
 
+# Run app
 shinyApp(ui, server)
 

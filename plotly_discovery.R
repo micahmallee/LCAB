@@ -53,10 +53,16 @@ create_xchr <- function(mSet) {
   return(xchr)
 }
 
-a <- list(
-  tick0 = 50
-)
+p <- plot_ly(x =  xchr[[1]]@rtime, y = xchr[[1]]@intensity, type = 'scatter', mode = 'lines', name = 'intensities', source = 'peakplot')
+p <- p %>% add_trace(x =  xchr[[1]]@chromPeaks[,4], y = xchr[[1]]@chromPeaks[,9], 
+                     type = 'scatter', mode = 'markers', name = paste0('Sample ', 1), text = xchr[[1]]@chromPeaks[,1], 
+                     hoverinfo = 'text') %>% highlight('plotly_selected', dynamic = TRUE)
+p
 
+
+
+
+# BS
 fig <- plot_ly(x =  xchr[[1]]@rtime, y = xchr[[1]]@intensity, type = 'scatter', mode = 'lines', name = 'intensities')
 fig <- fig %>% add_trace(x =  xchr[[2]]@rtime, y = xchr[[2]]@intensity, type = 'scatter', mode = 'lines', name = 'intensities2')
 fig <- fig %>% add_trace(x =  xchr[[2]]@rtime, y = xchr[[2]]@intensity, type = 'scatter', mode = 'lines', name = 'intensities2')
