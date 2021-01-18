@@ -258,7 +258,8 @@ server <- function(input, output, session){
       mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(param_optimized))
     }
     rvalues$mSet <- mSet
-    output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
+    #output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
+    output$peakamount <- renderText(rvalues$mSet)
     create_xchr <- function(mSet) {
       chr <- chromatogram(mSet[['onDiskData']])
       xchr <- as(chr, 'XChromatograms')
@@ -282,6 +283,7 @@ server <- function(input, output, session){
       }
       return(xchr)
     }
+    # plot plotly chromatogram with found peaks. 
     xchr <- create_xchr(mSet)
     sd <- SharedData$new(xchr)
     p <- plot_ly(x =  sd$origData()[[1]]@rtime, y = sd$origData()[[1]]@intensity, type = 'scatter', mode = 'lines', name = 'intensities', source = 'peakplot')
@@ -293,7 +295,7 @@ server <- function(input, output, session){
     output$foundpeaks <- renderPlotly(p)
   })
   
-  # plot plotly chromatogram with found peaks
+  # Show mass spectra of selected peaks
   observe({
     tmp <- event_data(event = "plotly_selected", priority = "event", source = 'peakplot')
     output$vsp <- renderPrint({
@@ -303,7 +305,7 @@ server <- function(input, output, session){
     output$mzplot <- renderPlot({
       mz <- rvalues$mSet$msFeatureData$chromPeaks[which(mSet$msFeatureData$chromPeaks[, 'rt'] == as.numeric(tmp$x)), 1]
       rt <- rvalues$mSet$msFeatureData$chromPeaks[which(mSet$msFeatureData$chromPeaks[, 'rt'] == as.numeric(tmp$x)), 4]
-      filterRt(rvalues$mSet[["onDiskData"]], c(rt - 1, rt + 1)) %>% filterMz(rvalues$mSet[["onDiskData"]], c(mz - 1, mz + 1)) %>% plot()
+      filterRt(rvalues$mSet$onDiskData, c(rt - 1, rt + 1)) %>% filterMz(rvalues$mSet$onDiskData, c(mz - 1, mz + 1)) %>% plot()
     })
   })
   
