@@ -130,7 +130,8 @@ ui <- dashboardPagePlus(
                 box(
                   title = 'Selected peaks',
                   verbatimTextOutput(outputId = 'vsp'),
-                  plotlyOutput('mzplot')
+                  tabsetPanel(id = "mztabs", 
+                              tabPanel('1', plotOutput('mzplot')))
                 )
                 )),
       tabItem('clustering',
@@ -246,7 +247,7 @@ server <- function(input, output, session){
     } else if(length(input$data_input$datapath) == 0) {
       showModal(modalDialog(
         title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
-        'Please upload data first.', 
+        'Please upload data first.',
         easyClose = T
       ))
       return()
@@ -258,8 +259,7 @@ server <- function(input, output, session){
       mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(param_optimized))
     }
     rvalues$mSet <- mSet
-    #output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
-    output$peakamount <- renderText(rvalues$mSet)
+    output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
     create_xchr <- function(mSet) {
       chr <- chromatogram(mSet[['onDiskData']])
       xchr <- as(chr, 'XChromatograms')
@@ -290,23 +290,31 @@ server <- function(input, output, session){
     for (i in 1:length(sd$origData())) {
       p <- p %>% add_trace(x =  sd$origData()[[i]]@chromPeaks[,4], y = sd$origData()[[i]]@chromPeaks[,9], 
                            type = 'bar', name = paste0('Sample ', i), text = sd$origData()[[i]]@chromPeaks[,1], 
-                           hoverinfo = 'text') %>% highlight('plotly_selected', dynamic = TRUE)
+                           hoverinfo = 'text') %>% event_register("plotly_selecting")
     }
     output$foundpeaks <- renderPlotly(p)
   })
   
-  # Show mass spectra of selected peaks
-  observe({
-    tmp <- event_data(event = "plotly_selected", priority = "event", source = 'peakplot')
-    output$vsp <- renderPrint({
-      tmp
-      tmp$x
-    })
-    output$mzplot <- renderPlot({
-      mz <- rvalues$mSet$msFeatureData$chromPeaks[which(mSet$msFeatureData$chromPeaks[, 'rt'] == as.numeric(tmp$x)), 1]
-      rt <- rvalues$mSet$msFeatureData$chromPeaks[which(mSet$msFeatureData$chromPeaks[, 'rt'] == as.numeric(tmp$x)), 4]
-      filterRt(rvalues$mSet$onDiskData, c(rt - 1, rt + 1)) %>% filterMz(rvalues$mSet$onDiskData, c(mz - 1, mz + 1)) %>% plot()
-    })
+  output$vsp <- renderPrint({
+    d <- event_data(event = "plotly_click", priority = "event", source = 'peakplot')
+    if (is.null(d)) "Click events appear here (double-click to clear)" 
+    else {
+      rvalues$mSet$msFeatureData$chromPeaks[which(rvalues$mSet$msFeatureData$chromPeaks[, 'rt'] == d$x),]
+    }
+  })
+  
+  output$mzplot <- renderPlot({
+    d <- event_data(event = "plotly_click", priority = "event", source = 'peakplot')
+    if (is.null(d)) {
+      NULL
+    }
+    else {
+      pkinfo <- as.data.frame(rvalues$mSet$msFeatureData$chromPeaks[which(rvalues$mSet$msFeatureData$chromPeaks[, 'rt'] == d$x),])
+      for (i in 1:ncol(pkinfo)) {
+        insertTab(inputId = 'mztabs', target = "1", tab = tabPanel(paste0(i + 1), plotOutput(outputId = paste0("mzplot", i))))
+        plot(filterRt(rvalues$mSet[["onDiskData"]], rt = c(pkinfo[4, i] - 0.001, pkinfo[4, i] + 0.001)))
+      }
+    }
   })
   
   # Run automatic parameter detection and update page with new values. NOT DONE
@@ -324,7 +332,7 @@ server <- function(input, output, session){
     updateNumericInput(session = session, inputId = 'v_prefilter', label = 'Value of prefilter', value = rvalues$optimized_params$best_parameters$value_of_prefilter, min = 0)
   })
   
-  # Allow upload and saving of currenct parameters for future use
+  # Allow upload and saving of current parameters for future use
   output$save_params <- downloadHandler(
     filename = function() {
       paste('params_', Sys.Date(), '.RData', sep = '')
@@ -332,7 +340,8 @@ server <- function(input, output, session){
     content = function(file) {
       param_initial <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = input$rtmethod, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
                                             snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter, mzdiff = input$mz_diff)
-      save(param_initial, file = file)
+      # save(param_initial, file = file)
+      save(rvalues$mSet, file = file)
     }
   )
 }
