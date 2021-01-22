@@ -10,9 +10,20 @@ param_optimized1 <- PerformParamsOptimization(raw_data1, param = param_initial, 
 
 rawData <- ImportRawMSData(data_folder_Sample,plotSettings = SetPlotParam(Plot=F))
 
-mSet <- PerformPeakProfiling(rawData,param_optimized1$best_parameters,
-                             plotSettings = SetPlotParam(Plot = T))
+mSet <- PerformPeakProfiling(rawData,param_optimized,
+                             plotSettings = SetPlotParam(Plot = F))
 annParams <- SetAnnotationParam(polarity = "negative", mz_abs_add = 0.005)
 annotPeaks <- PerformPeakAnnotation(mSet, annParams)
 maPeaks <- FormatPeakList(annotPeaks, annParams, filtIso =F, filtAdducts = FALSE,
                           missPercent = 1)
+
+mSet1 <- InitDataObjects("pktable", "stat", FALSE)
+
+mSet1 <- Read.TextData(mSet1, "metaboanalyst_input.csv", "colu", "disc")
+mSet2 <- SanityCheckData(mSet)
+
+
+mSet1 <- ReplaceMin(mSet1)
+
+mSet2 <- Ttests.Anal(mSet, F, 0.25, FALSE, TRUE)
+

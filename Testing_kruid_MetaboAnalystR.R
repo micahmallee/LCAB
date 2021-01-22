@@ -39,14 +39,16 @@ raw_kruiden_grouped <- ImportRawMSData(foldername = 'mzxml/', mode = "onDisk", p
 #'The PerformPeakProfiling function is an updated peak processing pipeline from XCMS R functions that performs peak detection, alignment, and grouping in an automatical step. 
 #'The function also generates two diagnostic plots including statistics on the total intensity of peaks in different samples, a retention time adjustment map, 
 #'and a PCA plot showing the overall sample clustering prior to data cleaning and statistical analysis.
-mSet <- PerformPeakProfiling(rawData = raw_kruiden, Params = param_optimized)
+mSet <- PerformPeakProfiling(rawData = raw_kruiden_grouped, Params = param_optimized2)
 
 
 # Annotatie parameters vaststellen
 annParams <- SetAnnotationParam(polarity = "positive")
 
 # Peaklist maken die ingelezen kan worden door de Metaboanalyst webapp
-annotPeaks <- PerformPeakAnnotation(mSet = mSet, annotaParam = annParams)
+annotPeaks2 <- PerformPeakAnnotation(mSet = mSet, annotaParam = annParams)
+maPeaks <- FormatPeakList(annotPeaks = annotPeaks2, annParams = annParams, filtIso = F, filtAdducts = F, missPercent = 0, includeRT = T)
+
 
 # matched filter:
 param_initial2 <- SetPeakParam(platform = 'general', Peak_method = 'matchedFilter')
