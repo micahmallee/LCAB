@@ -13,7 +13,7 @@ library(crosstalk)
 data <- readMSData(c('mzxml/KRUID_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML', 'mzxml/KRUID_126/Kruid 126 Zwarte peper 1 191119me_66.mzXML'), mode = 'onDisk')
 
 # LCAB:
-data <- readMSData(c('mzxml/Kruid_130/Kruid 130 Zwarte peper 5 191119me_70.mzXML', 'mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML'), mode = 'onDisk')
+data3 <- readMSData(c('mzxml/Kruid_130/Kruid 130 Zwarte peper 5 191119me_70.mzXML', 'mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML'), mode = 'onDisk')
 data2 <- readMSData('kruiden/Kruid 130 Zwarte peper 5 191119me_70.mzXML', mode = 'onDisk')
 param_optimized2 <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', mzdiff = 0,
                                  snthresh = 100, bw = 2, ppm = 22.35, min_peakwidth = 3, max_peakwidth = 37.5, 
@@ -29,7 +29,7 @@ param_test <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_me
                              family = 'gaussian', verbose.columns = FALSE, fitgauss = FALSE, integrate = 1, 
                              mzCenterFun = "wMean")
 
-smSet <- PerformPeakPicking(data2, param = updateRawSpectraParam(param_test))
+smSet <- PerformPeakPicking(data3, param = updateRawSpectraParam(param_test))
 smSet[["onDiskData"]]@phenoData@data[["sample_name"]] <- smSet[["onDiskData"]]@phenoData@data[["sampleNames"]]
 smSet[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
 smSet <- PerformPeakAlignment(smSet, param = updateRawSpectraParam(param_test))
