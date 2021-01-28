@@ -130,8 +130,9 @@ ui <- dashboardPagePlus(
                 box(
                   title = 'Selected peaks',
                   verbatimTextOutput(outputId = 'vsp'),
-                  tabsetPanel(id = "mztabs", 
-                              tabPanel('1', plotOutput('mzplot')))
+                  uiOutput(outputId = 'mztabui')
+                  # tabsetPanel(id = "mztabs", 
+                  #             tabPanel('1', plotOutput('mzplot')))
                 )
                 )),
       tabItem('clustering',
@@ -303,7 +304,9 @@ server <- function(input, output, session){
     }
   })
   
-  output$mzplot <- renderPlot({
+  output$mztabui <- renderUI({
+    tabsetPanel(id = "mztabs",
+                tabPanel('1', plotOutput('mzplot')))
     d <- event_data(event = "plotly_click", priority = "event", source = 'peakplot')
     if (is.null(d)) {
       NULL
@@ -316,6 +319,22 @@ server <- function(input, output, session){
       }
     }
   })
+  
+  
+  # output$mzplot <- renderPlot({
+  #   d <- event_data(event = "plotly_click", priority = "event", source = 'peakplot')
+  #   if (is.null(d)) {
+  #     NULL
+  #   }
+  #   else {
+  #     renderUI()
+  #     pkinfo <- as.data.frame(rvalues$mSet$msFeatureData$chromPeaks[which(rvalues$mSet$msFeatureData$chromPeaks[, 'rt'] == d$x),])
+  #     for (i in 1:ncol(pkinfo)) {
+  #       insertTab(inputId = 'mztabs', target = "1", tab = tabPanel(paste0(i + 1), plotOutput(outputId = paste0("mzplot", i))))
+  #       plot(filterRt(rvalues$mSet[["onDiskData"]], rt = c(pkinfo[4, i] - 0.001, pkinfo[4, i] + 0.001)))
+  #     }
+  #   }
+  # })
   
   # Run automatic parameter detection and update page with new values. NOT DONE
   observeEvent(input$paramdetectrun, {
