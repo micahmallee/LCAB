@@ -8,11 +8,240 @@ cdfdir <- system.file('extdata', package = 'metaMSdata')
 cdffiles <- list.files(cdfdir, pattern = "_GC_", full.names = T, ignore.case = T)
 result <- runGC(files = cdffiles, settings = TSQXLS.GC, DB = DB, nSlaves = 2)
 
-testresult <- runGC(files = c('mzxml/Kruid_130/Kruid 130 Zwarte peper 5 191119me_70.mzXML', 'mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML'), settings = TSQXLS.GC, DB = DB, nSlaves = 2)
+testresult <- runGC(files = c('mzxml/Kruid_130/Kruid 130 Zwarte peper 5 191119me_70.mzXML', 'mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML'), settings = TSQXLS.GC, DB = MoNA_DB, nSlaves = 2)
+juist <- to.msp(object = allSamples, file = NULL, settings = metaSetting(settings, "DBconstruction"))
 
-# use xcmsSet object
+settings2 <- settings
 
-result2 <- runGC(xset = smSet$xcmsSet, settings = TSQXLS.GC, DB = DB)
+
+function (object, file = NULL, settings = NULL, ndigit = 0, minfeat, 
+          minintens, intensity = c("maxo", "into"), secs2mins = TRUE) 
+{
+  if (!is.null(settings)) {
+    intensity <- settings$intensityMeasure
+    minfeat <- settings$minfeat
+    minintens <- settings$minintens
+  }
+  else {
+    intensity <- match.arg(intensity)
+  }
+  if (class(object) == "xsAnnotate") {
+    allpks <- object@groupInfo
+    minI <- minintens * max(allpks[, intensity])
+    tooSmall <- which(allpks[, intensity] < minI)
+    pspectra <- lapply(object@pspectra, function(x) x[!x %in% 
+                                                        tooSmall])
+  }
+  else {
+    minI <- minintens * max(object[, intensity])
+    allpks <- object[object[, intensity] >= minI, ]
+    pspectra <- split(1:nrow(allpks), allpks[, "rt"])
+  }
+  npeaks <- sapply(pspectra, length)
+  pspectra <- pspectra[npeaks >= minfeat]
+  if (!is.null(file)) {
+    if (length(pspectra) > 0) {
+      for (i in 1:length(pspectra)) {
+        ofile <- paste(file, "_", ceiling(i/1000), ".txt", 
+                       sep = "")
+        newfile <- (i%%1000) == 1
+        idx <- pspectra[[i]]
+        pks <- allpks[idx, , drop = FALSE]
+        pks <- pks[order(pks[, "mz"]), , drop = FALSE]
+        pks[, intensity] <- 1000 * pks[, intensity]/max(pks[, 
+                                                            intensity])
+        cat("Name: grp ", i, " (rt: ", mean(pks[, "rt"]), 
+            ")", sep = "", file = ofile, append = !newfile)
+        cat("\nNum Peaks:", nrow(pks), file = ofile, 
+            append = TRUE)
+        for (ii in 1:nrow(pks)) cat("\n(", round(pks[ii, 
+                                                     "mz"], ndigit), "\t", round(pks[ii, intensity], 
+                                                                                 ndigit), ")", file = ofile, append = TRUE, 
+                                    sep = "")
+        cat("\n\n", file = ofile, append = TRUE)
+      }
+    }
+  }
+  result <- removeDoubleMasses(lapply(pspectra, function(x) cbind(mz = round(allpks[x, 
+                                                                                    "mz"], digits = ndigit), allpks[x, c(intensity, "rt")])))
+  if (secs2mins) {
+    invisible(lapply(result, function(x) cbind(x[, c("mz", 
+                                                     intensity)], rt = x[, "rt"]/60)))
+  }
+  else {
+    invisible(result)
+  }
+}
+
+
+# Peak picking
+GCset <- peakDetection(files = cdffiles, settings = metaSetting(TSQXLS.GC, 'PeakPicking'), convert2list = T, nSlaves = 2)
+# Definition of pseudospectra
+allSamples <- lapply(GCset, runCAMERA, chrom = "GC", settings = metaSetting(TSQXLS.GC, "CAMERA"))
+allSamples.msp <- lapply(allSamples, to.msp, file = NULL, settings = metaSetting(TSQXLS.GC, "DBconstruction"))
+sapply(allSamples.msp, length)
+plotPseudoSpectrum(allSamples.msp[[1]][[26]])
+# Annotation
+DB.treated <- treat.DB(DB)
+allSam.matches <- matchSamples2DB(allSamples.msp, DB = DB.treated, settings = metaSetting(TSQXLS.GC, "match2DB"), quick = FALSE)
+allSam.matches
+matchExpSpec(allSamples.msp[[1]][[4]], DB.treated, DB.treated = TRUE, plotIt = TRUE)
+# Unknowns
+allSamples.msp.scaled <- lapply(allSamples.msp, treat.DB, isMSP = F)
+allSamples.matches <- matchSamples2Samples(allSamples.msp.scaled, allSamples.msp, annotations = allSam.matches$annotations, settings = metaSetting(TSQXLS.GC, "betweenSamples"))
+names(allSamples.matches)
+# Output
+features.df <- getFeatureInfo(stdDB = DB, allMatches = allSamples.matches, sampleList = allSamples.msp)
+features.df[, c(1:3, ncol(features.df) - 2:0)]
+PseudoSpectra <- constructExpPseudoSpectra(allMatches = allSamples.matches, standardsDB = DB)
+ann.df <- getAnnotationMat(exp.msp = allSamples.msp, pspectra = PseudoSpectra, allMatches = allSamples.matches)
+ann.df
+ann.df2 <- sweep(ann.df, 1, sapply(PseudoSpectra, function(x) max(x$pspectrum[, 2])), FUN = "*")
+ann.df2
+
+
+oke <- xsAnnotate(xs = xset)
+oke1 <- groupFWHM(object = oke)
+
+xsetCam <- runCAMERA(xset, chrom = "GC", settings = metaSetting(TSQXLS.GC, "CAMERA"))
+
+xsetmsp <- to.msp(xsetgrouped, file = NULL, settings = metaSetting(TSQXLS.GC, "DBconstruction"))
+
+
+# Convert MAR xcmsSet to xcms xcmsSet, no method for conversion, since slots are the same, loop through.
+xset <- smSet$xcmsSet
+annxset <- xsAnnotate(xs = xset, sample = c(1:2), polarity = 'positive')
+setjesgroeperen <- groupFWHM(object = annxset)
+
+# for (i in slotNames(xset)) {
+#   slot(lekkersetjehoor, i) <- slot(xset, i)
+# }
+
+result3 <- runGC(xset = setjesgroeperen, settings = TSQXLS.GC, DB = MoNA_DB)
+
+
+
+
+# GroupFWHM
+function (object, sigma = 6, perfwhm = 0.6, intval = "maxo") 
+{
+  if (!class(object) == "xsAnnotate") {
+    stop("no xsAnnotate object")
+  }
+  if (!sum(intval == c("into", "intb", "maxo"))) {
+    stop("unknown intensity value!")
+  }
+  sample <- object@sample
+  pspectra <- list()
+  psSamples <- NA
+  cat("Start grouping after retention time.\n")
+  if (object@groupInfo[1, "rt"] == -1) {
+    warning("Warning: no retention times avaiable. Do nothing\n")
+    return(invisible(object))
+  }
+  else {
+    if (is.na(sample[1]) || length(object@xcmsSet@filepaths) > 
+        1) {
+      if (is.na(sample[1])) {
+        index <- 1:length(object@xcmsSet@filepaths)
+      }
+      else {
+        index <- sample
+      }
+      gvals <- groupval(object@xcmsSet)[, index, drop = FALSE]
+      peakmat <- object@xcmsSet@peaks
+      groupmat <- groups(object@xcmsSet)
+      maxo <- as.numeric(apply(gvals, 1, function(x, peakmat) {
+        val <- na.omit(peakmat[x, intval])
+        if (length(val) == 0) {
+          return(NA)
+        } else {
+          return(max(val))
+        }
+      }, peakmat))
+      maxo[which(is.na(maxo))] <- -1
+      maxo <- cbind(1:length(maxo), maxo)
+      int.max <- as.numeric(apply(gvals, 1, function(x, 
+                                                     peakmat) {
+        which.max(peakmat[x, intval])
+      }, peakmat))
+      peakrange <- matrix(apply(gvals, 1, function(x, peakmat) {
+        val <- peakmat[x, intval]
+        if (length(na.omit(val)) == 0) {
+          return(c(0, 1))
+        }
+        else {
+          return(peakmat[x[which.max(val)], c("rtmin", 
+                                              "rtmax")])
+        }
+      }, peakmat), ncol = 2, byrow = TRUE)
+      colnames(peakrange) <- c("rtmin", "rtmax")
+      while (length(maxo) > 0) {
+        iint <- which.max(maxo[, 2])
+        rtmed <- groupmat[iint, "rtmed"]
+        rt.min <- peakrange[iint, "rtmin"]
+        rt.max <- peakrange[iint, "rtmax"]
+        hwhm <- ((rt.max - rt.min)/sigma * 2.35 * perfwhm)/2
+        irt <- which(groupmat[, "rtmed"] > (rtmed - hwhm) & 
+                       groupmat[, "rtmed"] < (rtmed + hwhm))
+        if (length(irt) > 0) {
+          idx <- maxo[irt, 1]
+          pspectra[[length(pspectra) + 1]] <- idx
+          psSamples[length(pspectra)] <- index[int.max[maxo[iint, 
+                                                            1]]]
+          maxo <- maxo[-irt, , drop = FALSE]
+          groupmat <- groupmat[-irt, , drop = FALSE]
+          peakrange <- peakrange[-irt, , drop = FALSE]
+        }
+        else {
+          idx <- maxo[iint, 1]
+          cat("Warning: Feature ", idx, " looks odd for at least one peak. Please check afterwards.\n")
+          pspectra[[length(pspectra) + 1]] <- idx
+          psSamples[length(pspectra)] <- index[int.max[maxo[iint, 
+                                                            1]]]
+          maxo <- maxo[-iint, , drop = FALSE]
+          groupmat <- groupmat[-iint, , drop = FALSE]
+          peakrange <- peakrange[-iint, , drop = FALSE]
+        }
+      }
+    }
+    else {
+      peakmat <- object@xcmsSet@peaks
+      maxo <- peakmat[, intval]
+      maxo <- cbind(1:length(maxo), maxo)
+      while (length(maxo) > 0) {
+        iint <- which.max(maxo[, 2])
+        rtmed <- peakmat[iint, "rt"]
+        rt.min <- peakmat[iint, "rtmin"]
+        rt.max <- peakmat[iint, "rtmax"]
+        hwhm <- ((rt.max - rt.min)/sigma * 2.35 * perfwhm)/2
+        irt <- which(peakmat[, "rt"] > (rtmed - hwhm) & 
+                       peakmat[, "rt"] < (rtmed + hwhm))
+        if (length(irt) > 0) {
+          idx <- maxo[irt, 1]
+          pspectra[[length(pspectra) + 1]] <- idx
+          maxo <- maxo[-irt, , drop = FALSE]
+          peakmat <- peakmat[-irt, , drop = FALSE]
+        }
+        else {
+          idx <- maxo[iint, 1]
+          cat("Warning: Feature ", idx, " looks odd for at least one peak. Please check afterwards.\n")
+          pspectra[[length(pspectra) + 1]] <- idx
+          maxo <- maxo[-iint, , drop = FALSE]
+          peakmat <- peakmat[-iint, , drop = FALSE]
+        }
+      }
+      psSamples <- rep(sample, length(pspectra))
+    }
+    object@pspectra <- pspectra
+    object@psSamples <- psSamples
+    cat("Created", length(object@pspectra), "pseudospectra.\n")
+  }
+  return(invisible(object))
+}
+
+
+
 
 
 

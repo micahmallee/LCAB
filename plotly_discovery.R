@@ -24,7 +24,7 @@ param_optimized2 <- SetPeakParam(platform = 'general', Peak_method = 'centWave',
 
 param_test <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', mzdiff = 0.01,
                              snthresh = 100, bw = 2, ppm = 22, min_peakwidth = 5, max_peakwidth = 30, 
-                             noise = 1000, prefilter = 3, value_of_prefilter = 1000, minFraction = 0.5, 
+                             noise = 1000, prefilter = 3, value_of_prefilter = 100, minFraction = 0.5, 
                              minSamples = 1, maxFeatures = 100, extra = 1, span = 0.25, smooth = 'loess', 
                              family = 'gaussian', verbose.columns = FALSE, fitgauss = FALSE, integrate = 1, 
                              mzCenterFun = "wMean")
