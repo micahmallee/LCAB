@@ -8,6 +8,7 @@ cdfdir <- system.file('extdata', package = 'metaMSdata')
 cdffiles <- list.files(cdfdir, pattern = "_GC_", full.names = T, ignore.case = T)
 result <- runGC(files = cdffiles, settings = TSQXLS.GC, DB = DB, nSlaves = 2)
 
+<<<<<<< HEAD
 testresult <- runGC(files = c('mzxml/Kruid_130/Kruid 130 Zwarte peper 5 191119me_70.mzXML', 'mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML'), settings = TSQXLS.GC, DB = MoNA_DB, nSlaves = 2)
 juist <- to.msp(object = allSamples, file = NULL, settings = metaSetting(settings, "DBconstruction"))
 
@@ -241,8 +242,91 @@ function (object, sigma = 6, perfwhm = 0.6, intval = "maxo")
 }
 
 
+=======
+testresult <- runGC(files = c('mzxml/Kruid_130/Kruid 130 Zwarte peper 5 191119me_70.mzXML', 'mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML'), settings = TSQXLS.GC, DB = DB, nSlaves = 2)
+juist <- to.msp(object = allSamples, file = NULL, settings = metaSetting(settings, "DBconstruction"))
+
+settings2 <- settings
+>>>>>>> 57efe2f095d2926b7a494efe3b7d235598ea8ead
 
 
+function (object, file = NULL, settings = NULL, ndigit = 0, minfeat, 
+          minintens, intensity = c("maxo", "into"), secs2mins = TRUE) 
+{
+  if (!is.null(settings)) {
+    intensity <- settings$intensityMeasure
+    minfeat <- settings$minfeat
+    minintens <- settings$minintens
+  }
+  else {
+    intensity <- match.arg(intensity)
+  }
+  if (class(object) == "xsAnnotate") {
+    allpks <- object@groupInfo
+    minI <- minintens * max(allpks[, intensity])
+    tooSmall <- which(allpks[, intensity] < minI)
+    pspectra <- lapply(object@pspectra, function(x) x[!x %in% 
+                                                        tooSmall])
+  }
+  else {
+    minI <- minintens * max(object[, intensity])
+    allpks <- object[object[, intensity] >= minI, ]
+    pspectra <- split(1:nrow(allpks), allpks[, "rt"])
+  }
+  npeaks <- sapply(pspectra, length)
+  pspectra <- pspectra[npeaks >= minfeat]
+  if (!is.null(file)) {
+    if (length(pspectra) > 0) {
+      for (i in 1:length(pspectra)) {
+        ofile <- paste(file, "_", ceiling(i/1000), ".txt", 
+                       sep = "")
+        newfile <- (i%%1000) == 1
+        idx <- pspectra[[i]]
+        pks <- allpks[idx, , drop = FALSE]
+        pks <- pks[order(pks[, "mz"]), , drop = FALSE]
+        pks[, intensity] <- 1000 * pks[, intensity]/max(pks[, 
+                                                            intensity])
+        cat("Name: grp ", i, " (rt: ", mean(pks[, "rt"]), 
+            ")", sep = "", file = ofile, append = !newfile)
+        cat("\nNum Peaks:", nrow(pks), file = ofile, 
+            append = TRUE)
+        for (ii in 1:nrow(pks)) cat("\n(", round(pks[ii, 
+                                                     "mz"], ndigit), "\t", round(pks[ii, intensity], 
+                                                                                 ndigit), ")", file = ofile, append = TRUE, 
+                                    sep = "")
+        cat("\n\n", file = ofile, append = TRUE)
+      }
+    }
+  }
+  result <- removeDoubleMasses(lapply(pspectra, function(x) cbind(mz = round(allpks[x, 
+                                                                                    "mz"], digits = ndigit), allpks[x, c(intensity, "rt")])))
+  if (secs2mins) {
+    invisible(lapply(result, function(x) cbind(x[, c("mz", 
+                                                     intensity)], rt = x[, "rt"]/60)))
+  }
+  else {
+    invisible(result)
+  }
+}
+
+
+
+
+
+# Convert MAR xcmsSet to xcms xcmsSet, no method for convertion, since slots are the same, loop through.
+xset <- smSet$xcmsSet
+for (i in slotNames(xset)) {
+  slot(lekkersetjehoor, i) <- slot(xset, i)
+}
+
+annxset <- xsAnnotate(xs = lekkersetjehoor, sample = c(1:2), polarity = 'positive')
+setjesgroeperen <- groupFWHM(object = annxset)
+
+annxset1 <- xsAnnotate(xs = xcms_peaks, sample = c(1:2), polarity = 'positive')
+setjesgroeperen <- groupFWHM(object = annxset)
+
+
+result3 <- runGC(xset = setjesgroeperen, settings = TSQXLS.GC, DB = MoNa_MSP_metaMS)
 
 
 function (files, xset, settings, rtrange = NULL, DB = NULL, removeArtefacts = TRUE, 
