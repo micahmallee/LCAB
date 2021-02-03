@@ -8,7 +8,7 @@ library(png)
 library(baseline)
 
 # Load data
-xcms_kruid_data <- readMSData(files = "mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML", mode = "onDisk")
+xcms_kruid_data <- readMSData(files = c("mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML", 'erah_test/Kruid_130/Kruid 130 Zwarte peper 5 191119me_70.mzXML'), mode = "onDisk")
 
 
 
