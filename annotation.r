@@ -23,7 +23,7 @@ smSet <- PerformPeakAlignment(smSet, param = updateRawSpectraParam(param_optimiz
 smSet <- PerformPeakFiling(smSet, param = updateRawSpectraParam(param_optimized2))
 smSet$xcmsSet@phenoData$sample_group <- gsub(' ', x = smSet$xcmsSet@phenoData$sample_name, replacement = '_')
 
-annParams <- SetAnnotationParam(polarity = 'negative')
+annParams <- SetAnnotationParam(polarity = 'positive')
 annotPeaks <- PerformPeakAnnotation(mSet = smSet, annotaParam = annParams)
 
 
