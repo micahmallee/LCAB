@@ -23,8 +23,8 @@ param_optimized2 <- SetPeakParam(platform = 'general', Peak_method = 'centWave',
                                  mzCenterFun = "wMean")
 
 param_test <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', mzdiff = 0.01,
-                             snthresh = 100, bw = 2, ppm = 22, min_peakwidth = 5, max_peakwidth = 30, 
-                             noise = 1000, prefilter = 3, value_of_prefilter = 100, minFraction = 0.5, 
+                             snthresh = 10, bw = 2, ppm = 20, min_peakwidth = 5, max_peakwidth = 30, 
+                             noise = 100, prefilter = 3, value_of_prefilter = 100, minFraction = 0.5, 
                              minSamples = 1, maxFeatures = 100, extra = 1, span = 0.25, smooth = 'loess', 
                              family = 'gaussian', verbose.columns = FALSE, fitgauss = FALSE, integrate = 1, 
                              mzCenterFun = "wMean")
@@ -75,6 +75,40 @@ p <- p %>% add_trace(x =  xchr[[1]]@chromPeaks[,4], y = xchr[[1]]@chromPeaks[,9]
                      hoverinfo = 'text') %>% highlight('plotly_selected', dynamic = F)
 p
 
+object1 <- smSet[["onDiskData"]]
+
+pkinfo <- smSet[["msFeatureData"]][["chromPeaks"]]
+
+plot(filterRt(smSet[["onDiskData"]], rt = c(as.numeric(pkinfo[1, 4] - 0.001), as.numeric(pkinfo[1, 4] + 0.001))))
+
+object <- smSet[["onDiskData"]]
+
+plot(object)
+
+function (object, ...) 
+{
+  .local <- function (object, rt, msLevel.) 
+  {
+    if (missing(rt)) 
+      return(object)
+    if (length(rt) != 2 | !is.numeric(rt)) 
+      stop("'rt' must be a numeric of length 2")
+    if (missing(msLevel.)) 
+      msLevel. <- base::sort(unique(msLevel(object)))
+    msLevel. <- as.numeric(msLevel.)
+    selms <- msLevel(object) %in% msLevel.
+    sel1 <- rtime(object) >= rt[1] & rtime(object) <= rt[2] & 
+      selms
+    sel2 <- !selms
+    object <- object[sel1 | sel2]
+    fltmsg <- paste0("Filter: select retention time [", paste0(rt, 
+                                                               collapse = "-"), "] and MS level(s), ", paste(unique(msLevel.), 
+                                                                                                             collapse = " "))
+    object <- MSnbase:::logging(object, fltmsg)
+    object
+  }
+  .local(object, ...)
+}
 
 
 

@@ -43,123 +43,129 @@ ui <- dashboardPagePlus(
     tabItems(
       tabItem('dashboard', 
               fluidRow(
-                box(
-                  title = 'Load data',
-                  helpText("Welcome to MetabOracle! Please upload your mzXML/mzML/netCDF data below."),
-                  fileInput(inputId = 'data_input', label = 'Select your file(s):', multiple = T, accept = c('.mzXML', 'mzxml', '.CDF', '.cdf', '.mzml', 'mzML')),
-                  sliderInput(inputId = 'rt.idx', label = 'rt.idx', min = 0, max = 1, step = 0.1, value = 0.6),
-                  radioButtons(inputId = 'inspect_trim', label = 'Inspect or upload data.',
-                               choices = list('Inspect' = 1,
-                                              'Upload' = 2),
-                               selected = 2, inline = T),
-                  actionButton(inputId = 'run', label = 'Run')
-                ),
-                box(
-                  imageOutput(outputId = 'inspect_plot') # %>% withSpinner()
-                ),
-                box(
-                  title = 'File information:',
-                  tableOutput(outputId = 'file'),
-                  textOutput('paths')
-                ))),
+                column(width = 2,
+                  box(width = 12,
+                    title = 'Load data',
+                    helpText("Welcome to MetabOracle! Please upload your mzXML/mzML/netCDF data below."),
+                    fileInput(inputId = 'data_input', label = 'Select your file(s):', multiple = T, accept = c('.mzXML', 'mzxml', '.CDF', '.cdf', '.mzml', 'mzML')),
+                    sliderInput(inputId = 'rt.idx', label = 'rt.idx', min = 0, max = 1, step = 0.1, value = 0.6),
+                    radioButtons(inputId = 'inspect_trim', label = 'Inspect or upload data.',
+                                 choices = list('Inspect' = 1,
+                                                'Upload' = 2),
+                                 selected = 2, inline = T),
+                    actionButton(inputId = 'run', label = 'Run')
+                  )),
+                column(width = 10,
+                       box(
+                         width = 12,
+                         imageOutput(outputId = 'inspect_plot') # %>% withSpinner()
+                       ),
+                       box(
+                         width = 12,
+                         title = 'File information:',
+                         tableOutput(outputId = 'file')
+                       )))),
       tabItem('peakpicking',
               fluidRow(
-                box(width = 2,
-                  title = 'Input parameters for peak picking',
-                  numericInput(inputId = 'ppm', label = 'ppm', value = NA, min = 0),
-                  bsTooltip(id = 'ppm', title = 'Maximum tolerated fluctuation of m/z value (ppm) from scan to scan - depends on the mass spectrometer accuracy', placement = 'left', trigger = 'hover'),
-                  numericInput(inputId = 'noise', label = 'Noise', value = 1000, min = 0),
-                  bsTooltip(id = 'noise', title = 'Each centroid must be greater than the "noise" intensity value', placement = 'left', trigger = 'hover'),
-                  numericInput(inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = 5, min = 0),
-                  bsTooltip(id = 'min_peakwidth', title = 'Minimum peak width in seconds', placement = 'left', trigger = 'hover'),
-                  numericInput(inputId = 'mz_diff', label = 'mz diff', value = 0.05, min = -0.01),
-                  bsTooltip(id = 'mz_diff', title = 'Minimum difference in m/z for peaks with overlapping retention times, can be negative to allow overlap', placement = 'left', trigger = 'hover'),
-                  numericInput(inputId = 'max_peakwidth', label = 'Maximum peakwidth', value = 20, min = 0),
-                  bsTooltip(id = 'max_peakwidth', title = 'Maximum peak width in seconds', placement = 'left', trigger = 'hover'),
-                  numericInput(inputId = 'snthresh', label = 'Signal to noise threshold', value = 10, min = 0),
-                  bsTooltip(id = 'snthresh', title = 'Signal to noise ratio cut-off (intensity)', placement = 'left', trigger = 'hover'),
-                  numericInput(inputId = 'prefilter', label = 'Prefilter', value = 3, min = 0),
-                  bsTooltip(id = 'prefilter', title = 'A peak must be present in x scans with an intensity greater than the value of the prefilter', placement = 'left', trigger = 'hover'),
-                  numericInput(inputId = 'v_prefilter', label = 'Value of prefilter', value = 100, min = 0),
-                  bsTooltip(id = 'v_prefilter', title = 'Value of prefilter', placement = 'left', trigger = 'hover'),
-                  actionButton(inputId = 'peakdetectrun', label = 'Perform peak detection'),
-                  actionButton(inputId = 'paramdetectrun', label = 'Detect parameters automatically')
+                column(
+                  width = 4,
+                  box(id = 'testje', width = 6,
+                      title = 'Input parameters for peak picking',
+                      numericInput(inputId = 'ppm', label = 'ppm', value = NA, min = 0),
+                      bsTooltip(id = 'ppm', title = 'Maximum tolerated fluctuation of m/z value (ppm) from scan to scan - depends on the mass spectrometer accuracy', placement = 'left', trigger = 'hover'),
+                      numericInput(inputId = 'noise', label = 'Noise', value = 1000, min = 0),
+                      bsTooltip(id = 'noise', title = 'Each centroid must be greater than the "noise" intensity value', placement = 'left', trigger = 'hover'),
+                      numericInput(inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = 5, min = 0),
+                      bsTooltip(id = 'min_peakwidth', title = 'Minimum peak width in seconds', placement = 'left', trigger = 'hover'),
+                      numericInput(inputId = 'mz_diff', label = 'mz diff', value = 0.05, min = -0.01),
+                      bsTooltip(id = 'mz_diff', title = 'Minimum difference in m/z for peaks with overlapping retention times, can be negative to allow overlap', placement = 'left', trigger = 'hover'),
+                      numericInput(inputId = 'max_peakwidth', label = 'Maximum peakwidth', value = 20, min = 0),
+                      bsTooltip(id = 'max_peakwidth', title = 'Maximum peak width in seconds', placement = 'left', trigger = 'hover'),
+                      numericInput(inputId = 'snthresh', label = 'Signal to noise threshold', value = 10, min = 0),
+                      bsTooltip(id = 'snthresh', title = 'Signal to noise ratio cut-off (intensity)', placement = 'left', trigger = 'hover'),
+                      numericInput(inputId = 'prefilter', label = 'Prefilter', value = 3, min = 0),
+                      bsTooltip(id = 'prefilter', title = 'A peak must be present in x scans with an intensity greater than the value of the prefilter', placement = 'left', trigger = 'hover'),
+                      numericInput(inputId = 'v_prefilter', label = 'Value of prefilter', value = 100, min = 0),
+                      bsTooltip(id = 'v_prefilter', title = 'Value of prefilter', placement = 'left', trigger = 'hover'),
+                      actionButton(inputId = 'peakdetectrun', label = 'Perform peak detection'),
+                      actionButton(inputId = 'paramdetectrun', label = 'Detect parameters automatically')
                   ),
-                div(id = 'align_param_box',
-                    box(width = 2,
-                        title = 'Input parameters for peak alignment',
-                        selectInput(inputId = 'rtmethod', label = 'Method', choices = list('loess' = 'loess', 'obiwarp' = 'obiwarp'),selected = 'loess'),
-                        # loess
-                        div(id = 'loessparams',
-                            numericInput(inputId = 'extra', label = 'Extra', value = 1, min = 0),
-                            bsTooltip(id = 'extra', title = 'Number of "extra" peaks used to define reference peaks (or well-behaved peaks) for modeling time deviation. Number of Peaks > number of samples.', placement = 'left', trigger = 'hover'),
-                            numericInput(inputId = 'span', label = 'Span', value = 0.25, min = 0),
-                            bsTooltip(id = 'span', title = 'Degree of smoothing of the loess model. 0.2 to 1', placement = 'left', trigger = 'hover')),
-                        # obiwarp
-                        div(id = 'obiwarpparams',
-                            numericInput(inputId = 'prof_step', label = 'profStep', value = 100, min = 0),
-                            bsTooltip(id = 'prof_step', title = 'Prof step', placement = 'left', trigger = 'hover')),
-                        # Grouping:
-                        numericInput(inputId = 'bw', label = 'Bandwith', value = 10, min = 1),
-                        bsTooltip(id = 'bw', title = 'Standart deviation of the gaussian metapeak that group peaks together.', placement = 'left', trigger = 'hover'),
-                        numericInput(inputId = 'min_fraction', label = 'minFraction', value = 0.5, min = 0),
-                        bsTooltip(id = 'min_fraction', title = 'Minimal fraction of samples a feature has to be present in', placement = 'left', trigger = 'hover'),
-                        numericInput(inputId = 'min_samples', label = 'minSamples', value = 1, min = 1),
-                        bsTooltip(id = 'min_samples', title = 'Minimum amount of samples a feature has to be present in', placement = 'left', trigger = 'hover'),
-                        selectInput(inputId = 'fitgauss', label = 'Fitgauss', choices = list('False' = 'FALSE', 'True' = 'TRUE'),selected = 'FALSE'),
-                        bsTooltip(id = 'fitgauss', title = 'If true, a gaussian is fitted to each peak', placement = 'left', trigger = 'hover'),
-                        selectInput(inputId = 'verbose_columns', label = 'Verbose columns', choices = list('False' = 'FALSE', 'True' = 'TRUE'),selected = 'FALSE'),
-                        bsTooltip(id = 'verbose_columns', title = 'If true additional peak meta data columns are returned', placement = 'left', trigger = 'hover'),
-                        numericInput(inputId = 'integrate', label = 'Integrate', value = 1, min = 0, max = 1),
-                        bsTooltip(id = 'integrate', title = 'Integration method. If =1 peak limits are found through descent on the mexicanhat filtered data, if =2 the descent is done on the real data. Method 2 is very accurate but prone to noise, while method 1 is more robust to noise but less exact.', placement = 'left', trigger = 'hover'),
-                        numericInput(inputId = 'max_features', label = 'maxFeatures', value = 100, min = 0),
-                        bsTooltip(id = 'max_features', title = 'Maximum number of features to be defined in one bin.', placement = 'left', trigger = 'hover')
-                    )
+                  div(id = 'align_param_box',
+                      box(width = 6,
+                          title = 'Input parameters for peak alignment',
+                          selectInput(inputId = 'rtmethod', label = 'Method', choices = list('loess' = 'loess', 'obiwarp' = 'obiwarp'),selected = 'loess'),
+                          # loess
+                          div(id = 'loessparams',
+                              numericInput(inputId = 'extra', label = 'Extra', value = 1, min = 0),
+                              bsTooltip(id = 'extra', title = 'Number of "extra" peaks used to define reference peaks (or well-behaved peaks) for modeling time deviation. Number of Peaks > number of samples.', placement = 'left', trigger = 'hover'),
+                              numericInput(inputId = 'span', label = 'Span', value = 0.25, min = 0),
+                              bsTooltip(id = 'span', title = 'Degree of smoothing of the loess model. 0.2 to 1', placement = 'left', trigger = 'hover')),
+                          # obiwarp
+                          div(id = 'obiwarpparams',
+                              numericInput(inputId = 'prof_step', label = 'profStep', value = 100, min = 0),
+                              bsTooltip(id = 'prof_step', title = 'Prof step', placement = 'left', trigger = 'hover')),
+                          # Grouping:
+                          numericInput(inputId = 'bw', label = 'Bandwith', value = 10, min = 1),
+                          bsTooltip(id = 'bw', title = 'Standart deviation of the gaussian metapeak that group peaks together.', placement = 'left', trigger = 'hover'),
+                          numericInput(inputId = 'min_fraction', label = 'minFraction', value = 0.5, min = 0),
+                          bsTooltip(id = 'min_fraction', title = 'Minimal fraction of samples a feature has to be present in', placement = 'left', trigger = 'hover'),
+                          numericInput(inputId = 'min_samples', label = 'minSamples', value = 1, min = 1),
+                          bsTooltip(id = 'min_samples', title = 'Minimum amount of samples a feature has to be present in', placement = 'left', trigger = 'hover'),
+                          selectInput(inputId = 'fitgauss', label = 'Fitgauss', choices = list('False' = 'FALSE', 'True' = 'TRUE'),selected = 'FALSE'),
+                          bsTooltip(id = 'fitgauss', title = 'If true, a gaussian is fitted to each peak', placement = 'left', trigger = 'hover'),
+                          selectInput(inputId = 'verbose_columns', label = 'Verbose columns', choices = list('False' = 'FALSE', 'True' = 'TRUE'),selected = 'FALSE'),
+                          bsTooltip(id = 'verbose_columns', title = 'If true additional peak meta data columns are returned', placement = 'left', trigger = 'hover'),
+                          numericInput(inputId = 'integrate', label = 'Integrate', value = 1, min = 0, max = 1),
+                          bsTooltip(id = 'integrate', title = 'Integration method. If =1 peak limits are found through descent on the mexicanhat filtered data, if =2 the descent is done on the real data. Method 2 is very accurate but prone to noise, while method 1 is more robust to noise but less exact.', placement = 'left', trigger = 'hover'),
+                          numericInput(inputId = 'max_features', label = 'maxFeatures', value = 100, min = 0),
+                          bsTooltip(id = 'max_features', title = 'Maximum number of features to be defined in one bin.', placement = 'left', trigger = 'hover')
+                      )
+                  ),
+                  box(width = 12,
+                      title = 'Upload or save parameters',
+                      downloadButton(outputId = 'save_params', label = 'Save parameters'),
+                      fileInput(inputId = 'upload_params', label = 'Upload parameters:', multiple = F, accept = '.RData')
+                  ),
                 ),
-                box(width = 2,
-                  title = 'Upload or save parameters',
-                  downloadButton(outputId = 'save_params', label = 'Save parameters'),
-                  fileInput(inputId = 'upload_params', label = 'Upload parameters:', multiple = F, accept = '.RData')
-                ),
-                box(
-                  width = 6,
-                  title = 'Results', 
-                  textOutput(outputId = 'peakamount'),
-                  plotlyOutput(outputId = 'foundpeaks')
-                ),
-                box(
-                  title = 'Selected peaks',
-                  verbatimTextOutput(outputId = 'vsp'),
-                  uiOutput(outputId = 'mztabui')
-                  # tabsetPanel(id = "mztabs", 
-                  #             tabPanel('1', plotOutput('mzplot')))
-                )
+                column(
+                  width = 8,
+                  box(
+                    width = 12,
+                    title = 'Results', 
+                    textOutput(outputId = 'peakamount'),
+                    plotlyOutput(outputId = 'foundpeaks')
+                  ),
+                  box(
+                    width = 12,
+                    title = 'Selected peaks',
+                    verbatimTextOutput(outputId = 'vsp'),
+                    uiOutput(outputId = 'mztabui')
+                    # tabsetPanel(id = "mztabs", 
+                    #             tabPanel('1', plotOutput('mzplot')))
+                  ))
                 )),
       tabItem('clustering',
               fluidRow(
                 box(
                   title = 'Clustertabitem'
-
                 )
               )),
       tabItem('statistics',
               fluidRow(
                 box(
                   title = 'Statistical analysis tabitem'
-
                 )
               )),
       tabItem('msea',
               fluidRow(
                 box(
                   title = 'MSEA tabitem'
-
                 )
               ))
     )
   ),
   footer = dashboardFooter(
-    left_text = 'MetabOracle 0.2',
+    left_text = 'MetabOracle 0.3',
     right_text = 'Made by Micah Mallée'
   )
 )
@@ -207,12 +213,13 @@ server <- function(input, output, session){
   })
   
   
-  output$file <- renderTable(input$data_input)
-  
-  output$paths <- renderText(length(input$data_input$datapath))
+  output$file <- renderTable(input$data_input[, 1:2])
   
   # Run button (upload vs inspect) check radiobutton, then run accordingly
   observeEvent(input$run, {
+    progress <- shiny::Progress$new()
+    on.exit(progress$close())
+    progress$set(message = "Creating plot", value = 10)
     if(input$inspect_trim == 1){
       output$inspect_plot <- renderPlot(PerformDataInspect(input$data_input$datapath))
       }
@@ -224,10 +231,11 @@ server <- function(input, output, session){
   
   # Check amount of samples. If less than 2, do not show alignment parameters
   observe({
-    if (length(input$data_input$datapath) >= 0) {
+    if (length(input$data_input$datapath) > 1) {
       shinyjs::show(id = 'align_param_box')
     } else {
       shinyjs::hide(id = 'align_param_box')
+      
     }
     
     if (input$rtmethod == 'loess') {
@@ -305,20 +313,38 @@ server <- function(input, output, session){
   })
   
   output$mztabui <- renderUI({
-    tabsetPanel(id = "mztabs",
-                tabPanel('1', plotOutput('mzplot')))
     d <- event_data(event = "plotly_click", priority = "event", source = 'peakplot')
     if (is.null(d)) {
       NULL
     }
     else {
-      pkinfo <- as.data.frame(rvalues$mSet$msFeatureData$chromPeaks[which(rvalues$mSet$msFeatureData$chromPeaks[, 'rt'] == d$x),])
-      for (i in 1:ncol(pkinfo)) {
-        insertTab(inputId = 'mztabs', target = "1", tab = tabPanel(paste0(i + 1), plotOutput(outputId = paste0("mzplot", i))))
-        plot(filterRt(rvalues$mSet[["onDiskData"]], rt = c(pkinfo[4, i] - 0.001, pkinfo[4, i] + 0.001)))
+      pkinfo <- rvalues$mSet$msFeatureData$chromPeaks[rvalues$mSet$msFeatureData$chromPeaks[, 'rt'] == d$x,, drop = F]
+      nTabs = nrow(pkinfo)
+      myTabs <- lapply(paste('Tab', 1:nTabs), tabPanel, ... = plotOutput(outputId = paste('Plot', 1:nTabs)))
+      do.call(tabsetPanel, myTabs)
+      for (i in myTabs) {
+        NULL
       }
-    }
+      }
   })
+  
+  
+  # output$mztabui <- renderUI({
+  #   tabsetPanel(id = "mztabs",
+  #               tabPanel('1', plotOutput('mzplot')))
+  #   d <- event_data(event = "plotly_click", priority = "event", source = 'peakplot')
+  #   if (is.null(d)) {
+  #     NULL
+  #   }
+  #   else {
+  #     pkinfo <- rvalues$mSet$msFeatureData$chromPeaks[rvalues$mSet$msFeatureData$chromPeaks[, 'rt'] == d$x,, drop = F]
+  #     for (i in 1:ncol(pkinfo)) {
+  #       insertTab(inputId = 'mztabs', target = "1", tab = tabPanel(paste0(i + 1), plotOutput(outputId = paste0("mzplot", i))))
+  #       # plot(filterRt(rvalues$mSet[["onDiskData"]], rt = c(pkinfo[i, 4] - 0.001, pkinfo[i, 4] + 0.001)))
+  #       # renderPlot(filterRt(rvalues$mSet[["onDiskData"]], rt = c(500, 501)))
+  #     }
+  #   }
+  # })
   
   
   # output$mzplot <- renderPlot({
