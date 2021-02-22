@@ -1,5 +1,4 @@
 # Plotly discovery
-install.packages('plotly')
 library(plotly)
 library(MetaboAnalystR)
 library(magrittr)
@@ -29,7 +28,7 @@ param_test <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_me
                              family = 'gaussian', verbose.columns = FALSE, fitgauss = FALSE, integrate = 1, 
                              mzCenterFun = "wMean")
 
-smSet <- PerformPeakPicking(data3, param = updateRawSpectraParam(param_test))
+smSet <- PerformPeakPicking(data, param = updateRawSpectraParam(param_test))
 smSet[["onDiskData"]]@phenoData@data[["sample_name"]] <- smSet[["onDiskData"]]@phenoData@data[["sampleNames"]]
 smSet[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
 smSet <- PerformPeakAlignment(smSet, param = updateRawSpectraParam(param_test))

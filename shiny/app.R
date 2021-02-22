@@ -1,3 +1,8 @@
+# Install packages
+# install.packages(c('shiny', 'shinydashboard', 'shinydashboardPlus', 'shinyjs', 'DT', 'crosstalk', 'plotly'))
+
+
+
 library(shiny)
 library(MetaboAnalystR)
 library(shinydashboard)
@@ -231,7 +236,7 @@ server <- function(input, output, session){
   
   # Check amount of samples. If less than 2, do not show alignment parameters
   observe({
-    if (length(input$data_input$datapath) > 1) {
+    if (length(input$data_input$datapath) >= 0) {
       shinyjs::show(id = 'align_param_box')
     } else {
       shinyjs::hide(id = 'align_param_box')
@@ -264,8 +269,8 @@ server <- function(input, output, session){
       mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
       mSet[["onDiskData"]]@phenoData@data[["sample_name"]] <- mSet[["onDiskData"]]@phenoData@data[["sampleNames"]]
       mSet[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
-      mSet <- PerformPeakAlignment(mSet, param = updateRawSpectraParam(param_optimized))
-      mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(param_optimized))
+      mSet <- PerformPeakAlignment(mSet, param = updateRawSpectraParam(params))
+      mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(params))
     }
     rvalues$mSet <- mSet
     output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
