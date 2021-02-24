@@ -7,7 +7,7 @@ data(FEMsettings)
 # Complete metaMS workflow
 cdfdir <- system.file('extdata', package = 'metaMSdata')
 cdffiles <- list.files(cdfdir, pattern = "_GC_", full.names = T, ignore.case = T)
-result1 <- runGC(files = cdffiles, settings = TSQXLS.GC, DB = mmsdb, nSlaves = 2)
+# result1 <- runGC(files = cdffiles, settings = TSQXLS.GC, DB = mmsdb, nSlaves = 2)
 
 # Whole proces behind runGC:
 ## Peak picking
@@ -161,4 +161,14 @@ matchSamples2DB <- function(xset.msp, DB, settings, quick) {
   
   list(annotations = mapply(annotations2tab, annotations, match.results, SIMPLIFY = FALSE))
 }
+
+
+
+allsimilarities <-  lapply(1:length(xsetmsp), function(x) {
+  for (i in 1:length(DB.treated2)) {
+    SpectrumSimilarity(spec.top = xsetmsp[[x]][, 1:2], spec.bottom = DB.treated2[[i]]$pspectrum, print.graphic = F, print.alignment = F)
+  }
+})
+
+
 
