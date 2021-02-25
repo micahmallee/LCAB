@@ -1,7 +1,14 @@
+library(metaMS)
+library(MetaboAnalystR)
+library(xcms)
+
+
 # Compound linking
 ## Data loading, database, peakprofiling etc
 ### LCAB:
 data <- readMSData(c('mzxml/Kruid_130/Kruid 130 Zwarte peper 5 191119me_70.mzXML', 'mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML'), mode = 'onDisk')
+### Home:
+data <- readMSData(files = c('kruiden/Kruid 131 Zwarte peper 6 191119me_71.mzXML', 'kruiden/Kruid 126 Zwarte peper 1 191119me_66.mzXML'), mode = 'onDisk')
 param_optimized <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', mzdiff = 0.01,
                            snthresh = 10, bw = 2, ppm = 20, min_peakwidth = 5, max_peakwidth = 30, 
                            noise = 100, prefilter = 3, value_of_prefilter = 100, minFraction = 0.5, 
