@@ -1,7 +1,7 @@
 library(metaMS)
 library(MetaboAnalystR)
 library(xcms)
-
+library(OrgMassSpecR)
 
 # Compound linking
 ## Data loading, database, peakprofiling etc
@@ -31,6 +31,7 @@ mona_msp <- read.msp(file = 'MoNA-export-GC-MS_Spectra.msp')
 ## Create pseudospectra
 xsetxcms <- xsAnnotate(xs = smSet$xcmsSet)
 xsetxcms <- groupFWHM(object = xsetxcms)
+xsetxcms2 <- groupCorr(xsetxcms)
 ### Correct format peakinfo
 convertedgroupedxset <- xsetxcms
 convertedgroupedxset@groupInfo <- convertedgroupedxset@xcmsSet@peaks
