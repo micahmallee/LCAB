@@ -20,7 +20,7 @@ plotPseudoSpectrum(allSamples.msp[[1]][[26]])
 ## Annotation
 DB.treated <- treat.DB(DB)
 DB.treated <- treat.DB(mmsdb)
-allSam.matches <- matchSamples2DB(allSamples.msp, DB = DB.treated, settings = metaSetting(TSQXLS.GC, "match2DB"), quick = FALSE)
+allSam.matches <- matchSamples2DB(allSamples.msp, DB = DB.treated2, settings = metaSetting(TSQXLS.GC, "match2DB"), quick = FALSE)
 allSam.matches
 matchExpSpec(allSamples.msp[[1]][[4]], DB.treated, DB.treated = TRUE, plotIt = TRUE)
 ## Unknowns
