@@ -2,6 +2,8 @@ library(metaMS)
 library(MetaboAnalystR)
 library(xcms)
 library(OrgMassSpecR)
+library(splashR)
+
 
 # Compound linking
 ## Data loading, database, peakprofiling etc
@@ -33,22 +35,63 @@ annotPeaks <- PerformPeakAnnotation(mSet = smSet, annotaParam = annParams)
 # Read MoNA database
 mona_msp <- read.msp(file = 'MoNA-export-GC-MS_Spectra.msp')
 
-## Create pseudospectra
-xsetxcms <- xsAnnotate(xs = smSet$xcmsSet)
-xsetxcms <- groupFWHM(object = xsetxcms)
-xsetxcms2 <- groupCorr(xsetxcms)
-### Correct format peakinfo
-convertedgroupedxset <- xsetxcms
-convertedgroupedxset@groupInfo <- convertedgroupedxset@xcmsSet@peaks
-xsetxcmsmsp <- to.msp(object = convertedgroupedxset, file = NULL, settings = metaSetting(TSQXLS.GC, 'DBconstruction'))
 
-DB.treated2 <- treat.DB(mona_msp)
+mona_splashes <- getsplashscores(mona_msp)
+kleinedb <- mona_msp[1:5]
+
+oke <- similarities(msp_query = yee.msp, database = mona_msp)
 
 
-# get mass spectra for each pseudospectrum
-#' oke je hebt dus je pseudospectra
-#' die geven de peaknummers aan met nagenoeg dezelfde rt
-#' om dan het massa spectrum te krijgen moet je op die rt het achterliggende massa spectrum pakken. Deze kan je dan als het goed is gebruiken
+getsplashscores <- function(msp_object) {
+  splashscoresquery <- vector(mode = "list", length = length(msp_object))
+  splashscoresquery <- lapply(1: length(msp_object), function(x) {
+    lapply(1:length(msp_object[[x]]), function(y) {
+      getSplash(msp_object[[x]][[y]][, 1:2])
+    })
+  })
+  return(splashscoresquery)
+}
+
+
+result <- matrix(0, length(database), length(msp_query[[1]]))
+result <- lapply(1:length(msp_query[[1]]), function(y) {
+  scores <- vector(mode = "numeric", length = length(database))
+  scores <- sapply(database, function(z) {
+    SpectrumSimilarity(spec.top = msp_query[[1]][[1]][, 1:2], spec.bottom = z$pspectrum, print.graphic = F, print.alignment = F)
+  })
+})
+
+
+result <- matrix(0, length(database), length(msp_query[[1]]))
+scores <- vector(mode = "numeric", length = length(msp_query[[1]]))
+
+dbhit <- sapply(1:length(database), function(z) {
+  scores <- vector(mode = "numeric", length = length(database))
+  scores[z] <- SpectrumSimilarity(spec.top = msp_query[[1]][[1]][, 1:2], spec.bottom = database[[z]]$pspectrum, print.graphic = F, print.alignment = F)
+  scores
+})
+result[z, y] <- SpectrumSimilarity(spec.top = msp_query[[1]][[1]][, 1:2], spec.bottom = database[[z]]$pspectrum, print.graphic = F, print.alignment = F)
+
+
+
+similarities <- function(msp_query, database) {
+  scores <- vector(mode = "numeric", length = length(database))
+  spectrasimmilarities <- vector(mode = "list", length = length(msp_query))
+  spectrasimmilarities <- lapply(1:length(msp_query), function(x) {
+    result <- matrix(0, length(database), length(msp_query[[x]]))
+    result <- lapply(1:length(msp_query[[x]]), function(y) {
+      scores <- sapply(database, function(z) {
+        SpectrumSimilarity(spec.top = msp_query[[x]][[y]][, 1:2], spec.bottom = z$pspectrum, print.graphic = F, print.alignment = F)
+      })
+    })
+    result
+  })
+}
+
+
+
+
+
 f <- c()
 for (i in smSet$xcmsSet@phenoData$sample_name) {f <- (c(f, gsub(x = i, " ", ".", fixed = T)))}
 yee <- xcms:::split.xcmsSet(smSet$xcmsSet, f = factor(f))
@@ -59,37 +102,5 @@ for (i in yee) {
   yee2 <- c(yee2, oke)
 }
 yee.msp <- lapply(yee2, to.msp, file = NULL, settings = metaSetting(TSQXLS.GC, "DBconstruction"))
-DB.treated3 <- DB.treated2[1:5]
-
-
-spectrasimmilarities <- c()
-for (i in yee.msp) {
-  lapply(1:length(DB.treated2), function(x) {
-    spectrasimmilarities <- c(spectrasimmilarities, SpectrumSimilarity(spec.top = yee.msp[[i]][, 1:2], spec.bottom = DB.treated2[[x]]$pspectrum, print.graphic = F, print.alignment = F))
-  })
-}
-
-result <- matrix(0, length(DB.treated3), length(yee.msp[[1]]))
-
-test <- sapply(1:length(DB.treated3), function(i) {
-  result <- SpectrumSimilarity(spec.top = yee.msp[[1]][[1]][, 1:2], spec.bottom = DB.treated3[[i]]$pspectrum, print.alignment = F, output.list = F, print.graphic = F)
-  result
-})
-
-
-match.results <- lapply(1:length(yee.msp), function(ii) {
-  result <- matrix(0, length(DB.treated3), length(yee.msp[[ii]]))
-  for (i in 1:length(yee.msp[[ii]])) {
-    result <- lapply(1:length(DB.treated3), function(jj) {
-      print(paste0(ii, ' ', i, ' ', jj))
-      resultaat <- SpectrumSimilarity(spec.top = yee.msp[[ii]][[i]][, 1:2], spec.bottom = DB.treated3[[jj]]$pspectrum, print.graphic = F, print.alignment = F)
-      result[i, jj] <- resultaat
-      # print(result)
-      result
-    })
-    print(result)
-  }
-  result
-})
 
 
