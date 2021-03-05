@@ -3,6 +3,7 @@ library(metaMS)
 library(metaMSdata)
 data(threeStdsDB)
 data(FEMsettings)
+rm(Orbitrap.RP, Synapt.NP, Synapt.RP)
 
 # Complete metaMS workflow
 cdfdir <- system.file('extdata', package = 'metaMSdata')
