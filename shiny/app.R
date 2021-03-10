@@ -48,19 +48,19 @@ ui <- dashboardPagePlus(
     tabItems(
       tabItem('dashboard', 
               fluidRow(
-                column(width = 2,
+                column(width = 3,
                   box(width = 12,
                     title = 'Load data',
                     helpText("Welcome to MetabOracle! Please upload your mzXML/mzML/netCDF data below."),
                     fileInput(inputId = 'data_input', label = 'Select your file(s):', multiple = T, accept = c('.mzXML', 'mzxml', '.CDF', '.cdf', '.mzml', 'mzML')),
-                    sliderInput(inputId = 'rt.idx', label = 'rt.idx', min = 0, max = 1, step = 0.1, value = 0.6),
+                    # sliderInput(inputId = 'rt.idx', label = 'rt.idx', min = 0, max = 1, step = 0.1, value = 0.6),
                     radioButtons(inputId = 'inspect_trim', label = 'Inspect or upload data.',
                                  choices = list('Inspect' = 1,
                                                 'Upload' = 2),
                                  selected = 2, inline = T),
                     actionButton(inputId = 'run', label = 'Run')
                   )),
-                column(width = 10,
+                column(width = 9,
                        box(
                          width = 12,
                          imageOutput(outputId = 'inspect_plot') # %>% withSpinner()
@@ -111,7 +111,7 @@ ui <- dashboardPagePlus(
                               bsTooltip(id = 'prof_step', title = 'Prof step', placement = 'left', trigger = 'hover')),
                           # Grouping:
                           numericInput(inputId = 'bw', label = 'Bandwith', value = 10, min = 1),
-                          bsTooltip(id = 'bw', title = 'Standart deviation of the gaussian metapeak that group peaks together.', placement = 'left', trigger = 'hover'),
+                          bsTooltip(id = 'bw', title = 'Standart deviation of the gaussian metapeak that groups peaks together.', placement = 'left', trigger = 'hover'),
                           numericInput(inputId = 'min_fraction', label = 'minFraction', value = 0.5, min = 0),
                           bsTooltip(id = 'min_fraction', title = 'Minimal fraction of samples a feature has to be present in', placement = 'left', trigger = 'hover'),
                           numericInput(inputId = 'min_samples', label = 'minSamples', value = 1, min = 1),
