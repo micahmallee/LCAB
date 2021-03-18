@@ -15,6 +15,10 @@ library(shinyjs)
 library(DT)
 library(crosstalk)
 library(plotly)
+library(metaMS)
+library(OrgMassSpecR)
+library(splashR)
+library(stringr)
 
 # Increase max upload size to 100 MB
 options(shiny.maxRequestSize=100*1024^2)

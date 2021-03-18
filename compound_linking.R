@@ -4,6 +4,9 @@ library(xcms)
 library(OrgMassSpecR)
 library(splashR)
 library(stringr)
+library(metaMSdata)
+data(FEMsettings)
+rm(Orbitrap.RP, Synapt.NP, Synapt.RP)
 
 # Compound linking
 ## Data loading, database, peakprofiling etc
@@ -29,9 +32,9 @@ smSet <- PerformPeakAlignment(smSet, param = updateRawSpectraParam(param_optimiz
 # Creates and fills xcmsSet
 smSet <- PerformPeakFiling(smSet, param = updateRawSpectraParam(param_optimized))
 # Annotation parameters and create annotated smSet
-annParams <- SetAnnotationParam(polarity = 'positive')
-# Annotated has pseudospectra (not sure if needed, some steps might be LC-MS specific)
-annotPeaks <- PerformPeakAnnotation(mSet = smSet, annotaParam = annParams)
+# annParams <- SetAnnotationParam(polarity = 'positive')
+# # Annotated has pseudospectra (not sure if needed, some steps might be LC-MS specific)
+# annotPeaks <- PerformPeakAnnotation(mSet = smSet, annotaParam = annParams)
 
 
 # Split mSet to nested xcmslist for further annotation
