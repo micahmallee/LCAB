@@ -8,6 +8,37 @@ library(metaMSdata)
 data(FEMsettings)
 rm(Orbitrap.RP, Synapt.NP, Synapt.RP)
 
+
+MSConvert_CMD <- paste0("docker run --rm -v `pwd`:`pwd` -w `pwd` chambm/pwiz-skyline-i-agree-to-the-vendor-licenses wine msconvert ", in_path, " --mzXML")
+system(MSConvert_CMD)
+
+test_data <- readMSData('test_data_mzxml/Test_nieuwe_kolom_MCX_SPE_KW1_Spike_18.mzXML', mode = 'onDisk')
+trimmed_test_data <- PerformDataTrimming(datapath = c("test_data_mzxml/"), rt.idx = 1, plot = F)
+params_opt <- PerformParamsOptimization(raw_data = trimmed_test_data, param = SetPeakParam(platform = 'general', Peak_method = 'centWave'))
+
+p23 <- Noise_evaluate(test_data)
+params <- SetPeakParam(ppm = 50, noise = p23$noise, value_of_prefilter = p23$value_of_prefilter, prefilter = p23$prefilter)
+smSet_test_data <- PerformPeakPicking(test_data, param = updateRawSpectraParam(params))
+smSet_test_data[["onDiskData"]]@phenoData@data[["sample_name"]] <- smSet_test_data[["onDiskData"]]@phenoData@data[["sampleNames"]]
+smSet_test_data[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
+# smSet_test_data <- PerformPeakAlignment(smSet_test_data, param = updateRawSpectraParam(params))
+# smSet_test_data <- PerformPeakFiling(smSet_test_data, param = updateRawSpectraParam(params))
+oke <- PerformPeakAnnotation(mSet = smSet_test_data, annotaParam = SetAnnotationParam())
+
+oke1 <- new(Class = 'xcmsSet')
+
+ja <- xcms::findChromPeaks(object = test_data, param = CentWaveParam(ppm = 22, peakwidth = c(2, 10), prefilter = c(0, 0) ))
+ja1 <- xcms::findChromPeaks(object = test_data, param = CentWaveParam(ppm = 22, peakwidth = c(2, 10), prefilter = c(p23$prefilter, p23$value_of_prefilter) ))
+ja2 <- xsAnnotate(ja1)
+ja2 <- groupFWHM(ja2)
+jamsp <- to.msp(object = ja2,settings = metaSetting(TSQXLS.GC, 'DBconstruction'), file = 'okee.msp')
+
+querysplash <- getsplashscores(list(jamsp))
+query_secondblocks <- getsecondblocks(querysplash)
+splashmatches <- matchsecondblocks(querysecondblocks = query_secondblocks, databasesecondblocks = mona_secondblocks)
+similarity_scores <- similarities(msp_query = list(jamsp), database = mona_msp, SPLASH_hits = splashmatches)
+
+
 # Compound linking
 ## Data loading, database, peakprofiling etc
 ### LCAB:
@@ -57,6 +88,15 @@ splashmatches <- matchsecondblocks(querysecondblocks = query_secondblocks, datab
 
 # Get similarity scores
 similarity_scores <- similarities(msp_query = mspxcmslist, database = mona_msp, SPLASH_hits = splashmatches)
+
+
+
+
+tophits <- function(similarity_scores, limit, database, splashmatches) {
+  topmatches
+}
+
+
 
 similarities <- function(msp_query, database, SPLASH_hits) {
   #' Calculate Spectrumsimilarity per SPLASH match
