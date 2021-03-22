@@ -37,7 +37,40 @@ querysplash <- getsplashscores(list(jamsp))
 query_secondblocks <- getsecondblocks(querysplash)
 splashmatches <- matchsecondblocks(querysecondblocks = query_secondblocks, databasesecondblocks = mona_secondblocks)
 similarity_scores <- similarities(msp_query = list(jamsp), database = mona_msp, SPLASH_hits = splashmatches)
+bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = splashmatches)
 
+for (i in 1:length(bestmatches)) {
+  try(expr = {
+    print(paste0('Best match: ', bestmatches[[i]][[1]][[1]][["Name"]], ' Score: ', bestmatches[[i]][[1]][["Score"]]))
+  }, silent = T)
+}
+
+#' Spiked data:
+#' L-Valine, TMS derivative
+#' Glycine, 3TMS derivative
+#' Serine, 3TMS derivative
+#' L-Threonine, 3TMS derivative
+#' L-Hydroxyproline, (E)-, 3TMS derivative
+#' DL-Phenylalanine, TMS derivative
+#' Phenylalanine, 2TMS derivative
+#' Octopamine, 3TMS derivative
+#' L-Lysine, 4TMS derivative        OUI MONSIEUR
+#' Octopamine, 4TMS derivative      
+#' Palmitic Acid, TMS derivative    
+#' Serotonin, 4TMS derivative       
+
+oke <- vector(length(test1[[1]]), mode = 'numeric')
+oke2 <- vector(length(test1[[1]]), mode = 'numeric')
+for (i in 1:length(test1[[1]])) {
+  woord <- str_split(test1[[1]][i], pattern = ',')
+  woord[[1]][2]
+  oke[[i]] <- woord[[1]][1]
+  oke2[[i]] <- woord[[1]][2]
+}
+
+lapply(test1[[1]], function(x) {
+  print(list(str_split(x, ','))[[1]][[1]][[2]])
+})
 
 # Compound linking
 ## Data loading, database, peakprofiling etc
@@ -89,15 +122,31 @@ splashmatches <- matchsecondblocks(querysecondblocks = query_secondblocks, datab
 # Get similarity scores
 similarity_scores <- similarities(msp_query = mspxcmslist, database = mona_msp, SPLASH_hits = splashmatches)
 
+# Get top x matches
+bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = splashmatches)
 
 
-
-tophits <- function(similarity_scores, limit, database, splashmatches) {
-  topmatches
+tophits <- function(similarity_scores, limit = 5, database, splashmatches) {
+  indexes_per_sample <- vector(mode = 'list', length = length(similarity_scores))
+  indexes_per_sample[[1]] <- lapply(seq_along(similarity_scores[[1]]), function(x){
+    top5_scores <- sort(unlist(similarity_scores[[1]][[x]]), decreasing = T)[1:limit]
+    top5_matches <- vector(mode = 'list', length = length(top5_scores))
+    top5_matches <- lapply(top5_scores, function(y){
+      matchandscore <- list(Match = '', Score = 0)
+      index1 <- grep(pattern = y, x = unlist(similarity_scores[[1]][[x]]))
+      if (!is.na(splashmatches[[1]][[x]][index1])) {
+        matchandscore[["Match"]] <- database[[splashmatches[[1]][[x]][index1[1]]]]
+        matchandscore[["Score"]] <- round((y * 100), 2)
+      } else {
+        matchandscore <- NULL
+      }
+      matchandscore
+    })
+  })
 }
 
 
-
+################### FIXEN matches per sample wordt niet gebruikt hahahaah
 similarities <- function(msp_query, database, SPLASH_hits) {
   #' Calculate Spectrumsimilarity per SPLASH match
   # Loop through hits

@@ -21,7 +21,12 @@ library(splashR)
 library(stringr)
 
 # Increase max upload size to 100 MB
-options(shiny.maxRequestSize=100*1024^2)
+options(shiny.maxRequestSize=100*4096^2)
+
+# Load MoNA_DB and SPLASH values
+mona_msp <- readRDS(file = 'data/mona_msp')
+mona_secondblocks <- readRDS(file = 'data/mona_secondblocks')
+
 
 # Define UI.
 # The front end of the webapp is created here.
@@ -181,9 +186,124 @@ ui <- dashboardPagePlus(
 
 # Back end of the webapp is created here.
 server <- function(input, output, session){
+  
+  # Define functions
+  tophits <- function(similarity_scores, limit = 5, database, splashmatches) {
+    indexes_per_sample <- vector(mode = 'list', length = length(similarity_scores))
+    indexes_per_sample[[1]] <- lapply(seq_along(similarity_scores[[1]]), function(x){
+      top5_scores <- sort(unlist(similarity_scores[[1]][[x]]), decreasing = T)[1:limit]
+      top5_matches <- vector(mode = 'list', length = length(top5_scores))
+      top5_matches <- lapply(top5_scores, function(y){
+        matchandscore <- list(Match = '', Score = 0)
+        index1 <- grep(pattern = y, x = unlist(similarity_scores[[1]][[x]]))
+        if (!is.na(splashmatches[[1]][[x]][index1])) {
+          matchandscore[["Match"]] <- database[[splashmatches[[1]][[x]][index1[1]]]]
+          matchandscore[["Score"]] <- round((y * 100), 2)
+        } else {
+          matchandscore <- NULL
+        }
+        matchandscore
+      })
+    })
+  }
+  
+  
+  ################### FIXEN matches per sample wordt niet gebruikt hahahaah
+  similarities <- function(msp_query, database, SPLASH_hits) {
+    #' Calculate Spectrumsimilarity per SPLASH match
+    # Loop through hits
+    allmatches <- vector(mode = 'list', length = length(SPLASH_hits))
+    allmatches <- lapply(seq_along(SPLASH_hits), function(x){
+      matches_per_sample <- vector(mode = 'list', length = length(SPLASH_hits[[x]]))
+      lapply(seq_along(SPLASH_hits[[x]]), function(y){
+        matches_per_pseudospectrum <- vector(mode = 'numeric', length = length(SPLASH_hits[[x]][[y]]))
+        matches_per_pseudospectrum <- sapply(SPLASH_hits[[x]][[y]], function(z){
+          SpectrumSimilarity(spec.top = msp_query[[x]][[y]][, 1:2], spec.bottom = database[[z]]$pspectrum, print.alignment = F, print.graphic = F)
+        })
+      })
+    })
+    # replace NaN values with 0
+    allmatches <- lapply(allmatches, function(x){
+      x <- lapply(x, function(y){
+        y <- sapply(y, function(z){
+          z <- ifelse(is.nan(z), 0, z)
+        })
+      })
+    })
+    return(allmatches)
+  }
+  
+  matchsecondblocks <- function(querysecondblocks, databasesecondblocks) {
+    #' This function takes the vectors containing the second SPLASH blocks for all pseudospectra.
+    #' Matches second block with second blokcs in database per sample. Returns list with matches per pseudospectra
+    matchindexes <- vector(mode = 'list', length = length(querysecondblocks))
+    matchindexes <- lapply(querysecondblocks, function(x) {
+      matchindexes1 <- vector(mode = 'list', length = length(x))
+      matchindexes1 <- sapply(x, function(y){
+        grep(pattern = y, x = databasesecondblocks)
+      })
+    })
+  }
+  
+  
+  getsecondblocks <- function(splashscores){
+    #' This function takes all second blocks from the SPLASH codes per pseudospectrum.
+    if (class(splashscores) == "character") {
+      blocks <- vector(mode = 'character', length = length(splashscores))
+      blocks <- sapply(splashscores, function(x){
+        str_split(string = x, pattern = '-', simplify = F)[[1]][[2]]
+      })
+    } else {
+      blocks <- vector(mode = "list", length = length(splashscores))
+      blocks <- lapply(seq_along(splashscores), function(x) {
+        blocks_psample <- vector(mode = 'character', length = length(splashscores[[x]]))
+        blocks_psample <- sapply(splashscores[[x]], function(y) {
+          str_split(string = y, pattern = '-', simplify = F)[[1]][[2]]
+        })
+      })
+    }
+    return(blocks)
+  }
+  
+  getsplashscores <- function(msp_object) {
+    #' This function calculates all SPLASH codes per pseudospectrum
+    if (class(msp_object[[1]][[1]]) == "character") {
+      splashscoresquery <- vector(mode = "character", length = length(msp_object))
+      splashscoresquery <- sapply(seq_along(msp_object), function(y) {
+        getSplash(msp_object[[y]]$pspectrum)
+      })
+    } else {
+      splashscoresquery <- vector(mode = "list", length = length(msp_object))
+      splashscoresquery <- lapply(seq_along(msp_object), function(x) {
+        lapply(1:length(msp_object[[x]]), function(y) {
+          getSplash(msp_object[[x]][[y]][, 1:2])
+        })
+      })
+    }
+    return(splashscoresquery)
+  }
+  
+  split_annotate <- function(mSet) {
+    #' This function splits the mSet object based on sample. 
+    #' Subsequently this function groups the peaks into pseudospectra.
+    f <- vector(mode = 'character', length = length(mSet$xcmsSet@phenoData$sample_name))
+    f <- sapply(mSet$xcmsSet@phenoData$sample_name, function(x) {
+      gsub(x = x, pattern = " ", replacement =  ".", fixed = T)
+    })
+    splitxcms <- xcms:::split.xcmsSet(smSet$xcmsSet, f = factor(f))
+    annotatedxcmslist <- vector(mode = 'list', length = length(f))
+    annotatedxcmslist <- lapply(splitxcms, function(x){
+      x <- xsAnnotate(x)
+      x <- groupFWHM(x)
+    })
+  }
+  
+  
   # Create a reactive value object
   rvalues <- reactiveValues()
 
+
+  
   # Dynamically set parameters
   rvalues$parameters <- reactive({
     # req(input$upload_params)
@@ -233,6 +353,9 @@ server <- function(input, output, session){
       output$inspect_plot <- renderPlot(PerformDataInspect(input$data_input$datapath))
       }
     else {
+      # MSConvert_CMD <- paste0("docker run --rm -v `pwd`:`pwd` -w `pwd` chambm/pwiz-skyline-i-agree-to-the-vendor-licenses wine msconvert ", input$data_input$datapath, " --mzXML")
+      # system(MSConvert_CMD)
+      # system('ls')
       rvalues$raw_data <- readMSData(files = input$data_input$datapath, mode = 'onDisk')
       output$inspect_plot <- renderPlot(plot(chromatogram(rvalues$raw_data)))
       }
@@ -399,6 +522,12 @@ server <- function(input, output, session){
     }
   )
 }
+
+
+
+
+
+
 
 # Run app
 shinyApp(ui, server)
