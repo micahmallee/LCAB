@@ -147,6 +147,7 @@ ui <- dashboardPagePlus(
                     width = 12,
                     title = 'Results', 
                     textOutput(outputId = 'peakamount'),
+                    textOutput(outputId = 'matches'),
                     plotlyOutput(outputId = 'foundpeaks')
                   ),
                   box(
@@ -186,7 +187,8 @@ ui <- dashboardPagePlus(
 
 # Back end of the webapp is created here.
 server <- function(input, output, session){
-  
+  ### functions
+  {
   # Define functions
   tophits <- function(similarity_scores, limit = 5, database, splashmatches) {
     indexes_per_sample <- vector(mode = 'list', length = length(similarity_scores))
@@ -298,7 +300,30 @@ server <- function(input, output, session){
     })
   }
   
-  
+  create_xchr <- function(mSet) {
+    chr <- chromatogram(mSet[['onDiskData']])
+    xchr <- as(chr, 'XChromatograms')
+    chrompks <- mSet[["msFeatureData"]][["chromPeaks"]]
+    chrompkd <- mSet[["msFeatureData"]][["chromPeakData"]]
+    rt <- mSet[["msFeatureData"]][["adjustedRT"]]
+    samples <- factor(chrompks[, "sample"], levels = 1:length(fileNames(mSet$onDiskData)))
+    chrompks <- split.data.frame(chrompks, samples)
+    chrompkd <- split.data.frame(chrompkd, samples)
+    if (length(xchr) > 1) {
+      for (i in 1:length(xchr)) {
+        xchr[[i]]@rtime <- rt[[i]]
+        xchr[[i]]@chromPeaks <- chrompks[[i]]
+        xchr[[i]]@chromPeakData <- chrompkd[[i]]
+      }
+    } else {
+      for (i in 1:length(xchr)) {
+        xchr[[i]]@chromPeaks <- chrompks[[i]]
+        xchr[[i]]@chromPeakData <- chrompkd[[i]]
+      }
+    }
+    return(xchr)
+  }
+}
   # Create a reactive value object
   rvalues <- reactiveValues()
 
@@ -398,32 +423,32 @@ server <- function(input, output, session){
       mSet[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
       mSet <- PerformPeakAlignment(mSet, param = updateRawSpectraParam(params))
       mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(params))
+      # Split mSet to nested xcmslist for further annotation
+      annotatedxcmslist <- split_annotate(mSet)
+      
+      # Convert to MSP format
+      # to.msp(object = test_data_xsannotate, file = NULL, settings = NULL, ndigit = 3, minfeat = 1, minintens = 0, intensity = "maxo", secs2mins = F)
+      mspxcmslist <- lapply(X = annotatedxcmslist, to.msp, file = NULL, settings = NULL, ndigit = 3, minfeat = 1, minintens = 0, intensity = "maxo", secs2mins = F)
+      querysplash <- getsplashscores(mspxcmslist)
+      query_secondblocks <- getsecondblocks(querysplash)
+      
+      # Match secondblocks
+      splashmatches <- matchsecondblocks(querysecondblocks = query_secondblocks, databasesecondblocks = mona_secondblocks)
+      
+      # Get similarity scores
+      similarity_scores <- similarities(msp_query = mspxcmslist, database = mona_msp, SPLASH_hits = splashmatches)
+      
+      # Get top x matches
+      bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = splashmatches)
     }
+    oke <- lapply(seq_along(bestmatches), function(x){
+      try(expr = {
+        print(paste0(x, '  Best match: ', bestmatches[[x]][[1]][[1]][["Name"]], ' Score: ', bestmatches[[x]][[1]][["Score"]]))
+      }, silent = T)
+    })
+    output$matches <- renderText(oke)
     rvalues$mSet <- mSet
     output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
-    create_xchr <- function(mSet) {
-      chr <- chromatogram(mSet[['onDiskData']])
-      xchr <- as(chr, 'XChromatograms')
-      chrompks <- mSet[["msFeatureData"]][["chromPeaks"]]
-      chrompkd <- mSet[["msFeatureData"]][["chromPeakData"]]
-      rt <- mSet[["msFeatureData"]][["adjustedRT"]]
-      samples <- factor(chrompks[, "sample"], levels = 1:length(fileNames(mSet$onDiskData)))
-      chrompks <- split.data.frame(chrompks, samples)
-      chrompkd <- split.data.frame(chrompkd, samples)
-      if (length(xchr) > 1) {
-        for (i in 1:length(xchr)) {
-          xchr[[i]]@rtime <- rt[[i]]
-          xchr[[i]]@chromPeaks <- chrompks[[i]]
-          xchr[[i]]@chromPeakData <- chrompkd[[i]]
-        }
-      } else {
-        for (i in 1:length(xchr)) {
-          xchr[[i]]@chromPeaks <- chrompks[[i]]
-          xchr[[i]]@chromPeakData <- chrompkd[[i]]
-        }
-      }
-      return(xchr)
-    }
     # plot plotly chromatogram with found peaks. 
     xchr <- create_xchr(mSet)
     sd <- SharedData$new(xchr)

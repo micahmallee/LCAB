@@ -37,19 +37,6 @@ splashmatches <- matchsecondblocks(querysecondblocks = query_secondblocks, datab
 similarity_scores <- similarities(msp_query = list(test_data_msp), database = mona_msp, SPLASH_hits = splashmatches)
 bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = splashmatches)
 
-
-ja <- xcms::findChromPeaks(object = test_data, param = CentWaveParam(ppm = 5, peakwidth = c(1, 30), prefilter = c(0, 0) ))
-ja1 <- xcms::findChromPeaks(object = test_data, param = CentWaveParam(ppm = 5, peakwidth = c(2, 10), prefilter = c(p23$prefilter, p23$value_of_prefilter)))
-ja2 <- xsAnnotate(okee)
-ja2 <- groupFWHM(ja2)
-jamsp <- to.msp(object = ja2,settings = metaSetting(TSQXLS.GC, 'DBconstruction'))
-
-querysplash <- getsplashscores(list(jamsp))
-query_secondblocks <- getsecondblocks(querysplash)
-splashmatches <- matchsecondblocks(querysecondblocks = query_secondblocks, databasesecondblocks = mona_secondblocks)
-similarity_scores <- similarities(msp_query = list(jamsp), database = mona_msp, SPLASH_hits = splashmatches)
-bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = splashmatches)
-
 for (i in 1:length(bestmatches)) {
   try(expr = {
     print(paste0(i, '  Best match: ', bestmatches[[i]][[1]][[1]][["Name"]], ' Score: ', bestmatches[[i]][[1]][["Score"]]))
@@ -232,8 +219,8 @@ function (spec.top, spec.bottom, t = 0.25, b = 10, top.label = NULL,
 ## Data loading, database, peakprofiling etc
 ### LCAB:
 data <- readMSData(c('mzxml/Kruid_130/Kruid 130 Zwarte peper 5 191119me_70.mzXML', 'mzxml/Kruid_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML'), mode = 'onDisk')
-### Home:
-data <- readMSData(files = c('kruiden/Kruid 131 Zwarte peper 6 191119me_71.mzXML', 'kruiden/Kruid 126 Zwarte peper 1 191119me_66.mzXML'), mode = 'onDisk')
+### Laptop:
+data <- readMSData(files = c('mzxml/KRUID_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML', 'mzxml/KRUID_126/Kruid 126 Zwarte peper 1 191119me_66.mzXML'), mode = 'onDisk')
 # Read MoNA database
 mona_msp <- read.msp(file = 'MoNA-export-GC-MS_Spectra.msp')
 param_optimized <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', mzdiff = 0.01,
@@ -266,7 +253,13 @@ mspxcmslist <- lapply(X = annotatedxcmslist, to.msp, file = NULL, settings = met
 
 kleinedb <- mona_msp[1:100]
 
-full_mona_splashes <- getsplashscores(mona_msp)
+full_mona_splashes <- vector(mode = 'character', length = length(mona_msp))
+full_mona_splashes <- sapply(mona_msp, function(x){
+  str_split(x$Comments, pattern = '\"')[[1]][22]
+})
+
+
+
 mona_secondblocks <- getsecondblocks(full_mona_splashes)
 
 querysplash <- getsplashscores(mspxcmslist)
