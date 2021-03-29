@@ -1,6 +1,3 @@
-# Install packages
-# install.packages(c('shiny', 'shinydashboard', 'shinydashboardPlus', 'shinyjs', 'DT', 'crosstalk', 'plotly'))
-
 
 
 library(shiny)
@@ -10,9 +7,7 @@ library(shinydashboardPlus)
 library(xcms)
 library(magrittr)
 library(shinycssloaders)
-library(shinyBS)
 library(shinyjs)
-library(DT)
 library(crosstalk)
 library(plotly)
 library(metaMS)

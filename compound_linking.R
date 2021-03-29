@@ -4,7 +4,6 @@ library(xcms)
 library(OrgMassSpecR)
 library(splashR)
 library(stringr)
-library(metaMSdata)
 data(FEMsettings)
 rm(Orbitrap.RP, Synapt.NP, Synapt.RP)
 
