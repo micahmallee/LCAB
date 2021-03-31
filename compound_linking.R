@@ -11,7 +11,9 @@ rm(Orbitrap.RP, Synapt.NP, Synapt.RP)
 MSConvert_CMD <- paste0("docker run --rm -v `pwd`:`pwd` -w `pwd` chambm/pwiz-skyline-i-agree-to-the-vendor-licenses wine msconvert ", in_path, " --mzXML")
 system(MSConvert_CMD)
 
-test_data <- readMSData('test_data_mzxml/Test_nieuwe_kolom_MCX_SPE_KW1_Spike_18.mzXML', mode = 'onDisk')
+in_path <- 'c://Users/Micah/Documents/LCAB/test_data_mzxml/raw/spike18.raw'
+
+test_data <- readMSData('test_data_mzxml/raw/spike18.mzXML', mode = 'onDisk')
 trimmed_test_data <- PerformDataTrimming(datapath = c("test_data_mzxml/"), rt.idx = 1, plot = F)
 params_opt <- PerformParamsOptimization(raw_data = trimmed_test_data, param = SetPeakParam(platform = 'general', Peak_method = 'centWave'))
 

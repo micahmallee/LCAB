@@ -2,8 +2,15 @@ raw_data1 <- ImportRawMSData(foldername = 'C://Users/Micah/Documents/Data_IBD/',
 raw_data2 <- readMSData(files = 'mzxml/KRUID_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML', mode = 'inMemory', msLevel. = 1)
 raw_data = raw_data2
 
+Sys.setenv('R_REMOTES_NO_ERRORS_FROM_WARNINGS' = 'true')
+
 POtest <- PerformParamsOptimization(raw_data = raw_data, param = SetPeakParam(platform = 'general', Peak_method = 'centWave'), ncore = 1)
 
+raw_data <- PerformDataTrimming('c://Users/Micah/Documents/QC_IBD/',rt.idx = 0.2)
+param_initial <- SetPeakParam(platform = "UPLC-Q/E") 
+param_optimized <- PerformParamsOptimization(raw_data, param = param_initial, ncore = 1)
+
+param_optimized <-OptiLCMS::PerformParamsOptimization(raw_data, param = OptiLCMS::SetPeakParam(), ncore = 1)
 
 
 function (raw_data, param = p0, method = "DoE", ncore = 4)
