@@ -36,15 +36,15 @@ splashmatches <- matchsecondblocks(querysecondblocks = query_secondblocks, datab
 similarity_scores <- similarities(msp_query = list(test_data_msp), database = mona_msp, SPLASH_hits = splashmatches)
 bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = splashmatches)
 
-for (i in 1:length(bestmatches)) {
+for (i in 1:length(bestmatches2)) {
   try(expr = {
-    print(paste0(i, '  Best match: ', bestmatches[[i]][[1]][[1]][["Name"]], ' Score: ', bestmatches[[i]][[1]][["Score"]]))
+    print(paste0(i, '  Best match: ', bestmatches2[[i]][[1]][[1]][["Name"]], ' Score: ', bestmatches2[[i]][[1]][["Score"]]))
   }, silent = T)
 }
 
 
 #' Spiked data:
-#' L-Valine, TMS derivative       Nee
+#' L-Valine, TMS derivative       andere splash
 #' Glycine, 3TMS derivative       half, wel .86 similarity, via MONA website wel!
 #' Serine, 3TMS derivative        Nee
 #' L-Threonine, 3TMS derivative   Nee
@@ -75,17 +75,29 @@ Glycine_TMS <- oke3
 Serine_TMS <- oke3
 L_Threonine_TMS <- oke3
 
+
 DL_Phenylalanine_TMS <- oke3
 Phenylalanine_TMS <- oke3
 Palmatic_acid_TMS <- oke3
 
+
+
 L_valine_results <- compare_single_compound(L_valine_TMS, test_data_msp)
+L_valine_results2 <- compare_single_compound(l_valine_msp[[1]]$pspectrum, test_data_msp)
 Glycine_results <- compare_single_compound(Glycine_TMS, test_data_msp)
 Serine_results <- compare_single_compound(Serine_TMS, test_data_msp)
+Serine_results2 <- compare_single_compound(serine_msp[[1]]$pspectrum, test_data_msp)
+Serine_results3 <- compare_single_compound(serine_msp2[[1]]$pspectrum, test_data_msp)
 L_Threonine_results <- compare_single_compound(compound = L_Threonine_TMS, test_data_msp)
+
+l_hydroxyproline_results <- compare_single_compound(compound = l_hydroxyproline[[1]]$pspectrum, database = test_data_msp)
+
+l_lysine_results <- compare_single_compound(l_lysine_msp[[1]]$pspectrum, test_data_msp)
 
 DL_Phenylalanine_results <- compare_single_compound(DL_Phenylalanine_TMS, test_data_msp)
 Phenylalanine_results <- compare_single_compound(compound = Phenylalanine_TMS, database = test_data_msp)
+Phenylalanine_results2 <- compare_single_compound(compound = Phenylalanine_TMS_2[[1]]$pspectrum, database = test_data_msp)
+
 Palmatic_acid_results <- compare_single_compound(Palmatic_acid_TMS, database = test_data_msp)
 
 silat_results <- compare_single_compound(compound = silat[[1]]$pspectrum, database = jamsp)
@@ -107,7 +119,7 @@ compare_single_compound <- function(compound, database) {
 oke <- c(rbind(jamsp[[1]][, 1], jamsp[[1]][, 2]))
 
 
-oke <- c(rbind(test_data_msp[[20]][, 1], test_data_msp[[20]][, 2]))
+oke <- c(rbind(test_data_msp[[14]][, 1], test_data_msp[[14]][, 2]))
 
 
 
@@ -295,6 +307,9 @@ tophits <- function(similarity_scores, limit = 5, database, splashmatches) {
 
 
 ################### FIXEN matches per sample wordt niet gebruikt hahahaah
+
+
+
 similarities <- function(msp_query, database, SPLASH_hits) {
   #' Calculate Spectrumsimilarity per SPLASH match
   # Loop through hits
@@ -319,7 +334,7 @@ similarities <- function(msp_query, database, SPLASH_hits) {
   return(allmatches)
 }
 
-matchsecondblocks <- function(querysecondblocks, databasesecondblocks) {
+match_secondblocks <- function(querysecondblocks, databasesecondblocks) {
   #' This function takes the vectors containing the second SPLASH blocks for all pseudospectra.
   #' Matches second block with second blokcs in database per sample. Returns list with matches per pseudospectra
   matchindexes <- vector(mode = 'list', length = length(querysecondblocks))
@@ -331,27 +346,72 @@ matchsecondblocks <- function(querysecondblocks, databasesecondblocks) {
   })
 }
 
+similarities_thirdblocks <- function(msp_query, database, nine_matches) {
+  #' Calculate Spectrumsimilarity per SPLASH match
+  # Loop through hits
+  allmatches <- vector(mode = 'list', length = length(nine_matches))
+  allmatches <- lapply(seq_along(nine_matches), function(x){
+    matches_per_sample <- vector(mode = 'list', length = length(nine_matches[[x]]))
+    matches_per_sample <- lapply(seq_along(nine_matches[[x]]), function(y){
+      matches_per_pseudospectrum <- vector(mode = 'numeric', length = length(nine_matches[[x]][[y]]))
+      matches_per_pseudospectrum <- sapply(nine_matches[[x]][[y]], function(z){
+        SpectrumSimilarity(spec.top = msp_query[[y]][, 1:2], spec.bottom = database[[z]]$pspectrum, print.alignment = F, print.graphic = F)
+      })
+    })
+  })
+  # replace NaN values with 0
+  # allmatches <- lapply(allmatches, function(x){
+  #   x <- lapply(x, function(y){
+  #     y <- sapply(y, function(z){
+  #       z <- ifelse(is.nan(z), 0, z)
+  #     })
+  #   })
+  # })
+  return(allmatches)
+}
 
-getsecondblocks <- function(splashscores){
-  #' This function takes all second blocks from the SPLASH codes per pseudospectrum.
+match_nines <- function(query_blocks, database_blocks) {
+  #' This function takes the vectors containing the third SPLASH blocks for all pseudospectra.
+  #' Matches the position of the character 9 in the the third blocks in database per sample. 
+  #' Returns list with matches per pseudospectra.
+  db_nines <- str_locate(database_blocks, '9')
+  query_nines <- str_locate(query_blocks[[1]], '9')
+  
+  total_indexes <- vector(mode = 'list', length = length(query_nines[, 1]))
+  
+  total_indexes <- lapply(seq_along(query_nines[, 1]), function(x) {
+    indexes <- vector(mode = 'numeric', length = length(db_nines[, 1]))
+    
+    indexes <- sapply(seq_along(db_nines[, 1]), function(y) ifelse(test = query_nines[,1][[x]] == db_nines[, 1][[y]], yes = y, no = 0))
+    
+    indexes <- indexes[indexes != 0]
+  })
+  return(total_indexes)
+}
+
+unlist(lapply(twee, function(x) which(een %in% x)))
+
+get_blocks <- function(splashscores, blocknr = 3){
+  #' This function takes all third blocks from the SPLASH codes per pseudospectrum.
   if (class(splashscores) == "character") {
     blocks <- vector(mode = 'character', length = length(splashscores))
     blocks <- sapply(splashscores, function(x){
-      str_split(string = x, pattern = '-', simplify = F)[[1]][[2]]
+      str_split(string = x, pattern = '-', simplify = F)[[1]][[blocknr]]
     })
   } else {
     blocks <- vector(mode = "list", length = length(splashscores))
     blocks <- lapply(seq_along(splashscores), function(x) {
       blocks_psample <- vector(mode = 'character', length = length(splashscores[[x]]))
       blocks_psample <- sapply(splashscores[[x]], function(y) {
-        str_split(string = y, pattern = '-', simplify = F)[[1]][[2]]
+        str_split(string = y, pattern = '-', simplify = F)[[1]][[blocknr]]
       })
     })
   }
   return(blocks)
 }
 
-getsplashscores <- function(msp_object) {
+
+get_splashscores <- function(msp_object) {
   #' This function calculates all SPLASH codes per pseudospectrum
   if (class(msp_object[[1]][[1]]) == "character") {
     splashscoresquery <- vector(mode = "character", length = length(msp_object))
