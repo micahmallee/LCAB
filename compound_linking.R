@@ -4,8 +4,8 @@ library(xcms)
 library(OrgMassSpecR)
 library(splashR)
 library(stringr)
-data(FEMsettings)
-rm(Orbitrap.RP, Synapt.NP, Synapt.RP)
+# data(FEMsettings)
+# rm(Orbitrap.RP, Synapt.NP, Synapt.RP)
 
 
 MSConvert_CMD <- paste0("docker run --rm -v `pwd`:`pwd` -w `pwd` chambm/pwiz-skyline-i-agree-to-the-vendor-licenses wine msconvert ", in_path, " --mzXML")
@@ -17,11 +17,8 @@ test_data <- readMSData('test_data_mzxml/raw/spike18.mzXML', mode = 'onDisk')
 trimmed_test_data <- PerformDataTrimming(datapath = c("test_data_mzxml/"), rt.idx = 1, plot = F)
 params_opt <- PerformParamsOptimization(raw_data = trimmed_test_data, param = SetPeakParam(platform = 'general', Peak_method = 'centWave'))
 
-params_pre <- SetPeakParam(platform = 'general', Peak_method = 'centWave')
-
-
 p23 <- Noise_evaluate(test_data)
-params <- SetPeakParam(ppm = p23$ppm, noise = p23$noise, value_of_prefilter = p23$value_of_prefilter, prefilter = p23$prefilter, min_peakwidth = 2, max_peakwidth = 10)
+params <- SetPeakParam(ppm = p23$ppm, noise = p23$noise, value_of_prefilter = p23$value_of_prefilter, prefilter = p23$prefilter, min_peakwidth = 1, max_peakwidth = 10)
 smSet_test_data <- PerformPeakPicking(test_data, param = updateRawSpectraParam(params))
 smSet_test_data[["onDiskData"]]@phenoData@data[["sample_name"]] <- smSet_test_data[["onDiskData"]]@phenoData@data[["sampleNames"]]
 smSet_test_data[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL

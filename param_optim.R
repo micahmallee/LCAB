@@ -12,6 +12,13 @@ param_optimized <- PerformParamsOptimization(raw_data, param = param_initial, nc
 
 param_optimized <-OptiLCMS::PerformParamsOptimization(raw_data, param = OptiLCMS::SetPeakParam(), ncore = 1)
 
+test_data_trimmed <- OptiLCMS::PerformROIExtraction(datapath = 'test_data_mzxml/converted/', rmConts = F, rt.idx = 1)
+test_data_inmem <- readMSData('test_data_mzxml/raw/spike18.mzXML', mode = 'inMemory', msLevel. = 1)
+param_optimized <-OptiLCMS::PerformParamsOptimization(test_data_trimmed, param = OptiLCMS::SetPeakParam(noise = 10, min_peakwidth = 2, max_peakwidth = 10), ncore = 1)
+
+oke_dan <- PerformPeakPicking(object = oke, param = SetPeakParam(Peak_method = 'centWave', snthresh = 10, min_peakwidth = 2, max_peakwidth = 10))
+
+oke <- OptiLCMS::ImportRawMSData(path = c('test_data_mzxml/raw/spike18.mzXML'), mode = 'onDisk')
 
 function (raw_data, param = p0, method = "DoE", ncore = 4)
 {
