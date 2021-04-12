@@ -293,11 +293,15 @@ server <- function(input, output, session){
       output$inspect_plot <- renderPlot(PerformDataInspect(input$data_input$datapath))
       }
     else {
-      # MSConvert_CMD <- paste0("docker run --rm -v `pwd`:`pwd` -w `pwd` chambm/pwiz-skyline-i-agree-to-the-vendor-licenses wine msconvert ", input$data_input$datapath, " --mzXML")
-      # system(MSConvert_CMD)
-      # system('ls')
-      rvalues$raw_data <- readMSData(files = input$data_input$datapath, mode = 'onDisk')
-      output$inspect_plot <- renderPlot(plot(chromatogram(rvalues$raw_data)))
+      MSConvert_CMD <- paste0("docker run chambm/pwiz-skyline-i-agree-to-the-vendor-licenses wine msconvert ", input$data_input$datapath, " --mzXML")
+      print(system('pwd'))
+      print(system('${PWD}'))
+      print(system('ls'))
+      system(MSConvert_CMD)
+      system('ls')
+      
+      # rvalues$raw_data <- readMSData(files = input$data_input$datapath, mode = 'onDisk')
+      # output$inspect_plot <- renderPlot(plot(chromatogram(rvalues$raw_data)))
       }
     })
   

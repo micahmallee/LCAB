@@ -15,42 +15,45 @@ system(MSConvert_CMD)
 # Preload MoNA_DB and SPLASH hashes
 mona_msp <- readRDS(file = 'shiny/data/mona_msp')
 mona_splashes <- readRDS(file = 'shiny/data/mona_splashes')
-
-## Annotation steps 1 sample
-### Load data
-test_data <- readMSData('test_data_mzxml/raw/spike18.mzXML', mode = 'onDisk')
-# mona_msp <- read.msp('MoNA-export-GC-MS_Spectra.msp')
-# trimmed_test_data <- PerformDataTrimming(datapath = c("test_data_mzxml/"), rt.idx = 1, plot = F)
-# params_opt <- PerformParamsOptimization(raw_data = trimmed_test_data, param = SetPeakParam(platform = 'general', Peak_method = 'centWave'))
-### Peak detection
-p23 <- Noise_evaluate(test_data)
-params <- SetPeakParam(ppm = 22, noise = p23$noise, value_of_prefilter = p23$value_of_prefilter, prefilter = p23$prefilter, min_peakwidth = 1, max_peakwidth = 15, snthresh = 10, mzdiff = 0.1)
-smSet_test_data <- PerformPeakPicking(test_data, param = updateRawSpectraParam(params))
-smSet_test_data[["onDiskData"]]@phenoData@data[["sample_name"]] <- smSet_test_data[["onDiskData"]]@phenoData@data[["sampleNames"]]
-smSet_test_data[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
-
-### Get pseudospectra and convert to msp format
-test_data_xcms <- mSet2xcmsSet(smSet_test_data)
-test_data_xsannotate <- xsAnnotate(test_data_xcms)
-test_data_xsannotate <- groupFWHM(test_data_xsannotate, perfwhm = 1)
-test_data_msp <- to.msp(object = test_data_xsannotate, file = NULL, settings = NULL, ndigit = 3, minfeat = 5, minintens = 0, intensity = "maxo", secs2mins = F)
-
-### Get SPLASH hashes and match thirdblocks
-querySPLASH <- get_splashscores(msp_list = list(test_data_msp))
-full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
-full_mona_SPLASHES <- sapply(mona_msp, function(x){
-  str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
+system.time({
+  ## Annotation steps 1 sample
+  ### Load data
+  test_data <- readMSData('test_data_mzxml/raw/spike18.mzXML', mode = 'onDisk')
+  # mona_msp <- read.msp('MoNA-export-GC-MS_Spectra.msp')
+  # trimmed_test_data <- PerformDataTrimming(datapath = c("test_data_mzxml/"), rt.idx = 1, plot = F)
+  # params_opt <- PerformParamsOptimization(raw_data = trimmed_test_data, param = SetPeakParam(platform = 'general', Peak_method = 'centWave'))
+  ### Peak detection
+  p23 <- Noise_evaluate(test_data)
+  params <- SetPeakParam(ppm = 22, noise = p23$noise, value_of_prefilter = p23$value_of_prefilter, prefilter = p23$prefilter, min_peakwidth = 1, max_peakwidth = 15, snthresh = 10, mzdiff = 0.1)
+  smSet_test_data <- PerformPeakPicking(test_data, param = updateRawSpectraParam(params))
+  smSet_test_data[["onDiskData"]]@phenoData@data[["sample_name"]] <- smSet_test_data[["onDiskData"]]@phenoData@data[["sampleNames"]]
+  smSet_test_data[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
+  
+  ### Get pseudospectra and convert to msp format
+  test_data_xcms <- mSet2xcmsSet(smSet_test_data)
+  test_data_xsannotate <- xsAnnotate(test_data_xcms)
+  test_data_xsannotate <- groupFWHM(test_data_xsannotate, perfwhm = 1)
+  test_data_msp <- to.msp(object = test_data_xsannotate, file = NULL, settings = NULL, ndigit = 3, minfeat = 5, minintens = 0, intensity = "maxo", secs2mins = F)
+  
+  ### Get SPLASH hashes and match thirdblocks
+  querySPLASH <- get_splashscores(msp_list = list(test_data_msp))
+  full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
+  full_mona_SPLASHES <- sapply(mona_msp, function(x){
+    str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
+  })
+  query_thirdblocks <- lapply(querySPLASH, get_blocks, blocknr = 3)
+  database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
+  SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
+  similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = test_data_msp, database = mona_msp)
+  
+  ### Get x top matches
+  bestmatches <- tophits(similarity_scores = similarity_scores, limit = 15, database = mona_msp, splashmatches = SPLASH_matches)
+  names(x = bestmatches) <- c(seq_along(bestmatches))
+  bestmatches <- Filter(function(k) length(k) > 0, bestmatches)
+  matchmatrix <- t(data.table::rbindlist(bestmatches))
 })
-query_thirdblocks <- lapply(querySPLASH, get_blocks, blocknr = 3)
-database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
-SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
-similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = test_data_msp, database = mona_msp)
 
-### Get x top matches
-bestmatches <- tophits(similarity_scores = similarity_scores, limit = 15, database = mona_msp, splashmatches = SPLASH_matches)
-names(x = bestmatches) <- c(seq_along(bestmatches))
-bestmatches <- Filter(function(k) length(k) > 0, bestmatches)
-matchmatrix <- t(data.table::rbindlist(bestmatches))
+
 
 ## Multiple samples
 msamples <- readMSData(c('mzxml/KRUID_126/Kruid 126 Zwarte peper 1 191119me_66.mzXML', 'mzxml/KRUID_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML'), mode = 'onDisk')
