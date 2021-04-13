@@ -7,10 +7,32 @@ library(stringr)
 # data(FEMsettings)
 # rm(Orbitrap.RP, Synapt.NP, Synapt.RP)
 
-
 in_path <- 'c://Users/Micah/Documents/LCAB/test_data_mzxml/raw/spike18.raw'
 MSConvert_CMD <- paste0("docker run --rm -v `pwd`:`pwd` -w `pwd` chambm/pwiz-skyline-i-agree-to-the-vendor-licenses wine msconvert ", in_path, " --mzXML")
 system(MSConvert_CMD)
+
+tweesamples <- readMSData(files = list.files('kruiden/', full.names = T), mode = 'onDisk')
+
+
+plot_chrom_tic_bpc <- function(raw_data) {
+  plotData <- data.frame(scantime = rtime(raw_data), tic = tic(raw_data), bpc = bpi(raw_data))
+  p <- plot_ly(source = "p") %>% 
+    add_trace(data = plotData, x = ~scantime, y = ~tic, type = "scatter", mode = "lines", line = list(color = "rgba(0, 0, 0,0.7)", width = 0.8), 
+              text = ~paste(scantime, "s"), name = "<b>Total ion chromatogram</b>") %>% 
+    add_trace(data = plotData, x = ~scantime, y = ~bpc, type = "scatter", mode = "lines", line = list(color = "rgba(0, 215, 167,1)", width = 1.1), 
+              text = ~paste(round(bpc, 4), "m/z"), name = "<b>Base peak chromatogram</b>") %>% 
+    layout(legend = list(x = 0.7, y = 0.99), 
+           xaxis = list(title = "Scan time (s)", range = c(0, max(plotData$scantime)), showspikes = TRUE, spikemode = "toaxis+across", spikesnap = "data", 
+                        showline = FALSE, zeroline = FALSE, spikedash = "solid", showgrid = TRUE), 
+           yaxis = list(title = "Counts", showgrid = FALSE, showticklabels = TRUE, zeroline = FALSE, showline = FALSE), hovermode = "x", showlegend = TRUE) %>% 
+    event_register("plotly_click")
+  return(p)
+}
+
+
+oke <- plot_chrom_tic_bpc(test_data)
+
+
 
 # Preload MoNA_DB and SPLASH hashes
 mona_msp <- readRDS(file = 'shiny/data/mona_msp')
@@ -18,7 +40,7 @@ mona_splashes <- readRDS(file = 'shiny/data/mona_splashes')
 system.time({
   ## Annotation steps 1 sample
   ### Load data
-  test_data <- readMSData('test_data_mzxml/raw/spike18.mzXML', mode = 'onDisk')
+  test_data <- readMSData('test_data_mzxml/Test_nieuwe_kolom_MCX_SPE_KW1_Spike_18.mzXML', mode = 'onDisk')
   # mona_msp <- read.msp('MoNA-export-GC-MS_Spectra.msp')
   # trimmed_test_data <- PerformDataTrimming(datapath = c("test_data_mzxml/"), rt.idx = 1, plot = F)
   # params_opt <- PerformParamsOptimization(raw_data = trimmed_test_data, param = SetPeakParam(platform = 'general', Peak_method = 'centWave'))
