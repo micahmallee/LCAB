@@ -30,7 +30,7 @@ plot_chrom_tic_bpc <- function(raw_data) {
 }
 
 
-oke <- plot_chrom_tic_bpc(test_data)
+oke <- plot_chrom_tic_bpc(tweesamples)
 
 
 

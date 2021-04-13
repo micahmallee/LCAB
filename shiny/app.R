@@ -69,7 +69,7 @@ ui <- dashboardPage(
                 column(width = 9,
                        box(
                          width = 12,
-                         imageOutput(outputId = 'inspect_plot', height = '1000px') # %>% withSpinner()
+                         plotlyOutput(outputId = 'inspect_plot') # %>% withSpinner()
                        ),
                        box(
                          width = 12,
@@ -207,8 +207,20 @@ ui <- dashboardPage(
 server <- function(input, output, session){
   ### functions
   {
-    
-    
+  plot_chrom_tic_bpc <- function(raw_data) {
+    plotData <- data.frame(scantime = rtime(raw_data), tic = tic(raw_data), bpc = bpi(raw_data))
+    p <- plot_ly(source = "p") %>% 
+      add_trace(data = plotData, x = ~scantime, y = ~tic, type = "scatter", mode = "lines", line = list(color = "rgba(0, 0, 0,0.7)", width = 0.8), 
+                text = ~paste(scantime, "s"), name = "<b>Total ion chromatogram</b>") %>% 
+      add_trace(data = plotData, x = ~scantime, y = ~bpc, type = "scatter", mode = "lines", line = list(color = "rgba(0, 215, 167,1)", width = 1.1), 
+                text = ~paste(round(bpc, 4), "m/z"), name = "<b>Base peak chromatogram</b>") %>% 
+      layout(legend = list(x = 0.7, y = 0.99), 
+             xaxis = list(title = "Scan time (s)", range = c(0, max(plotData$scantime)), showspikes = TRUE, spikemode = "toaxis+across", spikesnap = "data", 
+                          showline = FALSE, zeroline = FALSE, spikedash = "solid", showgrid = TRUE), 
+             yaxis = list(title = "Counts", showgrid = FALSE, showticklabels = TRUE, zeroline = FALSE, showline = FALSE), hovermode = "x", showlegend = TRUE) %>% 
+      event_register("plotly_click")
+    return(p)
+    }
     
   create_xchr <- function(mSet) {
     chr <- chromatogram(mSet[['onDiskData']])
@@ -440,7 +452,7 @@ server <- function(input, output, session){
       # system(MSConvert_CMD)
       # system('ls')
       rvalues$raw_data <- readMSData(files = input$data_input$datapath, mode = 'onDisk')
-      output$inspect_plot <- renderPlot(plot(chromatogram(rvalues$raw_data)))
+      output$inspect_plot <- renderPlotly(plot_chrom_tic_bpc(rvalues$raw_data))
       }
     })
   
