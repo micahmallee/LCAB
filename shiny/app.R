@@ -21,7 +21,7 @@ options(shiny.maxRequestSize=100*4096^2)
 # Preload MoNA_DB and SPLASH hashes
 mona_msp <- readRDS(file = 'data/mona_msp')
 mona_splashes <- readRDS(file = 'data/mona_splashes')
-msetje <- readRDS(file = 'data/mset')
+# msetje <- readRDS(file = 'data/mset')
 # matchmatrix <- readRDS(file = 'data/matchestable')
 
 
@@ -246,23 +246,23 @@ server <- function(input, output, session){
     return(xchr)
   }
   
-  tophits <- function(similarity_scores, limit = 5, database, splashmatches) {
-    indexes_per_sample <- vector(mode = 'list', length = length(similarity_scores))
-    indexes_per_sample[[1]] <- lapply(seq_along(similarity_scores[[1]]), function(x){
-      top5_scores <- sort(unlist(similarity_scores[[1]][[x]]), decreasing = T)[1:limit]
-      top5_matches <- vector(mode = 'list', length = length(top5_scores))
-      top5_matches <- lapply(top5_scores, function(y){
-        index1 <- grep(pattern = y, x = unlist(similarity_scores[[1]][[x]]))
-        if (!is.na(splashmatches[[1]][[x]][index1]) & as.numeric(y) > 0.8) {
-          paste0('Compound: ', as.character(database[[splashmatches[[1]][[x]][index1[1]]]]["Name"]), '   Score: ', round((y * 100), 2))
-          # matchandscore[["Match"]] <- as.character(database[[splashmatches[[1]][[x]][index1[1]]]]["Name"])
-          # matchandscore[["Score"]] <- round((y * 100), 2)
-        } else {
-          # matchandscore <- NULL
-          NULL
-        }
-        # matchandscore
+  tophits <- function(similarity_scores, limit = 5, database, splashmatches, score_cutoff = 0.8) {
+    lapply(seq_along(similarity_scores), function(z){
+      indexes_per_sample <- vector(mode = 'list', length = length(similarity_scores))
+      indexes_per_sample <- lapply(seq_along(similarity_scores[[z]]), function(x){
+        top5_scores <- sort(unlist(similarity_scores[[z]][[x]]), decreasing = T)[1:limit]
+        top5_matches <- vector(mode = 'list', length = length(top5_scores))
+        top5_matches <- lapply(top5_scores, function(y){
+          index1 <- grep(pattern = y, x = unlist(similarity_scores[[z]][[x]]))
+          if (!is.na(splashmatches[[z]][[x]][index1]) & as.numeric(y) > score_cutoff) {
+            paste0('Compound: ', as.character(database[[splashmatches[[z]][[x]][index1[1]]]]["Name"]), '   Score: ', round((y * 100), 2))
+          } else {
+            NULL
+          }
+        })
       })
+      names(indexes_per_sample) <- c(seq_along(indexes_per_sample))
+      indexes_per_sample <- Filter(function(k) length(k) > 0, indexes_per_sample)
     })
   }
   
@@ -394,7 +394,7 @@ server <- function(input, output, session){
   # Create a reactive value object
   rvalues <- reactiveValues()
   
-  rvalues$mSet <- msetje
+  # rvalues$mSet <- msetje
   
   # Dynamically set parameters
   rvalues$parameters <- reactive({
@@ -473,21 +473,21 @@ server <- function(input, output, session){
   
   observeEvent(input$peakannotationrun, {
     updateBox('compoundbox', action = 'toggle')
-    mSet <- rvalues$mSet
-    mSet_xsannotate <- mSet2xcmsSet(mSet)
+    mSet_xsannotate <- mSet2xcmsSet(rvalues$mSet)
     mSet_xsannotate <- xsAnnotate(mSet_xsannotate)
     mSet_xsannotate <- groupFWHM(mSet_xsannotate, perfwhm = input$perfwhm)
     mSet_msp <- to.msp(object = mSet_xsannotate, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
     querySPLASH <- get_splashscores(msp_list = list(mSet_msp))
-    full_mona_SPLASHES <- mona_splashes
+    full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
+    full_mona_SPLASHES <- sapply(mona_msp, function(x){
+      str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
+    })
     query_thirdblocks <- lapply(querySPLASH, get_blocks, blocknr = 3)
     database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
     SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
     similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = mSet_msp, database = mona_msp)
-    bestmatches <- tophits(similarity_scores = similarity_scores, limit = 15, database = mona_msp, splashmatches = SPLASH_matches)
-    names(x = bestmatches) <- c(seq_along(bestmatches))
-    bestmatches <- Filter(function(k) length(k) > 0, bestmatches)
-    matchmatrix <- t(data.table::rbindlist(bestmatches))
+    bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.8)
+    # matchmatrix <- t(data.table::rbindlist(bestmatches[[1]]))
     output$foundcompoundstable <- renderDT({
       datatable(matchmatrix, class = 'cell-border stripe')
     })
@@ -517,15 +517,10 @@ server <- function(input, output, session){
     }
     rvalues$mSet <- mSet
     output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
-    # plot plotly chromatogram with found peaks. 
-    xchr <- create_xchr(mSet)
-    sd <- SharedData$new(xchr)
-    p <- plot_ly(x =  sd$origData()[[1]]@rtime, y = sd$origData()[[1]]@intensity, type = 'scatter', mode = 'lines', name = 'intensities', source = 'peakplot')
-    for (i in 1:length(sd$origData())) {
-      p <- p %>% add_trace(x =  sd$origData()[[i]]@chromPeaks[,4], y = sd$origData()[[i]]@chromPeaks[,9], 
-                           type = 'bar', name = paste0('Sample ', i), text = sd$origData()[[i]]@chromPeaks[,1], 
-                           hoverinfo = 'text') %>% event_register("plotly_selecting")
-    }
+    p <- plot_chrom_tic_bpc(mSet$onDiskData)
+    p <- p %>% add_trace(data = data.frame(mSet$msFeatureData$chromPeaks), 
+                         x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
+                         name = paste(mSet$onDiskData@phenoData@data$sample_name, ' total peaks'))
     output$foundpeaks <- renderPlotly(p)
   })
   
@@ -580,11 +575,5 @@ server <- function(input, output, session){
 }
 
 
-
-
-
-
-
 # Run app
 shinyApp(ui, server)
-

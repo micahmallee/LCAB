@@ -29,8 +29,9 @@ plot_chrom_tic_bpc <- function(raw_data) {
   return(p)
 }
 
-
-oke <- plot_chrom_tic_bpc(tweesamples)
+p <- plot_chrom_tic_bpc(smSet_test_data$onDiskData)
+p <- p %>% add_trace(data = data.frame(smSet_test_data$msFeatureData$chromPeaks), x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, name = paste(smSet_test_data$onDiskData@phenoData@data$sample_name, ' total peaks'))
+p
 
 
 
@@ -40,13 +41,14 @@ mona_splashes <- readRDS(file = 'shiny/data/mona_splashes')
 system.time({
   ## Annotation steps 1 sample
   ### Load data
-  test_data <- readMSData('test_data_mzxml/Test_nieuwe_kolom_MCX_SPE_KW1_Spike_18.mzXML', mode = 'onDisk')
+  # test_data <- readMSData('test_data_mzxml/Test_nieuwe_kolom_MCX_SPE_KW1_Spike_18.mzXML', mode = 'onDisk')
+  test_data <- readMSData('test_data_mzxml/converted/spike18.mzXML', mode = 'onDisk')
   # mona_msp <- read.msp('MoNA-export-GC-MS_Spectra.msp')
   # trimmed_test_data <- PerformDataTrimming(datapath = c("test_data_mzxml/"), rt.idx = 1, plot = F)
   # params_opt <- PerformParamsOptimization(raw_data = trimmed_test_data, param = SetPeakParam(platform = 'general', Peak_method = 'centWave'))
   ### Peak detection
-  p23 <- Noise_evaluate(test_data)
-  params <- SetPeakParam(ppm = 22, noise = p23$noise, value_of_prefilter = p23$value_of_prefilter, prefilter = p23$prefilter, min_peakwidth = 1, max_peakwidth = 15, snthresh = 10, mzdiff = 0.1)
+  # p23 <- Noise_evaluate(test_data)
+  params <- SetPeakParam(ppm = 22, noise = 0, value_of_prefilter = 0.001, prefilter = 2, min_peakwidth = 1, max_peakwidth = 15, snthresh = 100)
   smSet_test_data <- PerformPeakPicking(test_data, param = updateRawSpectraParam(params))
   smSet_test_data[["onDiskData"]]@phenoData@data[["sample_name"]] <- smSet_test_data[["onDiskData"]]@phenoData@data[["sampleNames"]]
   smSet_test_data[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
@@ -54,8 +56,8 @@ system.time({
   ### Get pseudospectra and convert to msp format
   test_data_xcms <- mSet2xcmsSet(smSet_test_data)
   test_data_xsannotate <- xsAnnotate(test_data_xcms)
-  test_data_xsannotate <- groupFWHM(test_data_xsannotate, perfwhm = 1)
-  test_data_msp <- to.msp(object = test_data_xsannotate, file = NULL, settings = NULL, ndigit = 3, minfeat = 5, minintens = 0, intensity = "maxo", secs2mins = F)
+  test_data_xsannotate <- groupFWHM(test_data_xsannotate, perfwhm = 0.6)
+  test_data_msp <- to.msp(object = test_data_xsannotate, file = NULL, settings = NULL, ndigit = 3, minfeat = 3, minintens = 0, intensity = "maxo", secs2mins = F)
   
   ### Get SPLASH hashes and match thirdblocks
   querySPLASH <- get_splashscores(msp_list = list(test_data_msp))
@@ -69,10 +71,8 @@ system.time({
   similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = test_data_msp, database = mona_msp)
   
   ### Get x top matches
-  bestmatches <- tophits(similarity_scores = similarity_scores, limit = 15, database = mona_msp, splashmatches = SPLASH_matches)
-  names(x = bestmatches) <- c(seq_along(bestmatches))
-  bestmatches <- Filter(function(k) length(k) > 0, bestmatches)
-  matchmatrix <- t(data.table::rbindlist(bestmatches))
+  bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.6)
+  matchmatrix <- t(data.table::rbindlist(bestmatches[[1]]))
 })
 
 
@@ -197,25 +197,26 @@ similarity_scores <- similarities(msp_query = mspxcmslist, database = mona_msp, 
 bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = splashmatches)
 
 
-tophits <- function(similarity_scores, limit = 5, database, splashmatches) {
-  indexes_per_sample <- vector(mode = 'list', length = length(similarity_scores))
-  indexes_per_sample[[1]] <- lapply(seq_along(similarity_scores[[1]]), function(x){
-    top5_scores <- sort(unlist(similarity_scores[[1]][[x]]), decreasing = T)[1:limit]
-    top5_matches <- vector(mode = 'list', length = length(top5_scores))
-    top5_matches <- lapply(top5_scores, function(y){
-      index1 <- grep(pattern = y, x = unlist(similarity_scores[[1]][[x]]))
-      if (!is.na(splashmatches[[1]][[x]][index1]) & as.numeric(y) > 0.8) {
-        paste0('Compound: ', as.character(database[[splashmatches[[1]][[x]][index1[1]]]]["Name"]), '   Score: ', round((y * 100), 2))
-        # matchandscore[["Match"]] <- as.character(database[[splashmatches[[1]][[x]][index1[1]]]]["Name"])
-        # matchandscore[["Score"]] <- round((y * 100), 2)
-      } else {
-        # matchandscore <- NULL
-        NULL
-      }
-      # matchandscore
+tophits <- function(similarity_scores, limit = 5, database, splashmatches, score_cutoff = 0.8) {
+  lapply(seq_along(similarity_scores), function(z){
+    indexes_per_sample <- vector(mode = 'list', length = length(similarity_scores))
+    indexes_per_sample <- lapply(seq_along(similarity_scores[[z]]), function(x){
+      top5_scores <- sort(unlist(similarity_scores[[z]][[x]]), decreasing = T)[1:limit]
+      top5_matches <- vector(mode = 'list', length = length(top5_scores))
+      top5_matches <- lapply(top5_scores, function(y){
+        index1 <- grep(pattern = y, x = unlist(similarity_scores[[z]][[x]]))
+        if (!is.na(splashmatches[[z]][[x]][index1]) & as.numeric(y) > score_cutoff) {
+          paste0('Compound: ', as.character(database[[splashmatches[[z]][[x]][index1[1]]]]["Name"]), '   Score: ', round((y * 100), 2))
+        } else {
+          NULL
+        }
+      })
     })
+    names(indexes_per_sample) <- c(seq_along(indexes_per_sample))
+    indexes_per_sample <- Filter(function(k) length(k) > 0, indexes_per_sample)
   })
 }
+
 
 similarities_thirdblocks <- function(nine_matches, msp_query, database) {
   #' Calculate Spectrumsimilarity per SPLASH match
