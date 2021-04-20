@@ -26,6 +26,9 @@ plot_chrom_tic_bpc <- function(raw_data) {
                         showline = FALSE, zeroline = FALSE, spikedash = "solid", showgrid = TRUE), 
            yaxis = list(title = "Counts", showgrid = FALSE, showticklabels = TRUE, zeroline = FALSE, showline = FALSE), hovermode = "x", showlegend = TRUE) %>% 
     event_register("plotly_click")
+  for (i in seq_along()) {
+    
+  }
   return(p)
 }
 
@@ -76,6 +79,18 @@ system.time({
 })
 
 
+convertxsAnnotate <- function(object) {
+  truexsAnnotate <- new('xsAnnotate')
+  for (i in names(object$AnnotateObject)) {
+    slot(truexsAnnotate, i) <- object$AnnotateObject[[i]]
+  }
+  return(truexsAnnotate)
+}
+
+ok1 <- convertxsAnnotate(oke, jaa)
+
+
+
 
 ## Multiple samples
 msamples <- readMSData(c('mzxml/KRUID_126/Kruid 126 Zwarte peper 1 191119me_66.mzXML', 'mzxml/KRUID_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML'), mode = 'onDisk')
@@ -86,8 +101,23 @@ smSet_msamples[["onDiskData"]]@phenoData@data[["sample_name"]] <- smSet_msamples
 smSet_msamples[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
 smSet_msamples <- PerformPeakAlignment(smSet_msamples, param = updateRawSpectraParam(params2))
 smSet_msamples <- PerformPeakFiling(smSet_msamples, param = updateRawSpectraParam(params2))
-xcmslist <-  split_annotate(mSet = smSet_msamples)
-msplist <- lapply(xcmslist, to.msp, file = NULL, settings = NULL, ndigit = 3, minfeat = 5, minintens = 0, intensity = "maxo", secs2mins = F)
+xcmslist <-  split_annotate(mSet = smSet_msamples, perfwhm = 0.6)
+msplist <- lapply(xcmslist, to.msp, file = NULL, settings = NULL, ndigit = 3, minfeat = 10, minintens = 0, intensity = "maxo", secs2mins = F)
+querySPLASH1 <- get_splashscores(msp_list = msplist)
+full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
+full_mona_SPLASHES <- sapply(mona_msp, function(x){
+  str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
+})
+query_thirdblocks1 <- lapply(querySPLASH1, get_blocks, blocknr = 3)
+database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
+SPLASH_matches1 <- lapply(query_thirdblocks1, match_nines, database_blocks = database_thirdblocks)
+similarity_scores1 <- similarities_thirdblocks(nine_matches = SPLASH_matches1, msp_query = msplist, database = mona_msp)
+bestmatches1 <- tophits(similarity_scores = similarity_scores1, limit = 5, database = mona_msp, splashmatches = SPLASH_matches1, score_cutoff = 0.8)
+for (i in seq_along(bestmatches1)) {
+  nam <- paste0('matchmatrix',i)
+   assign(nam, t(data.table::rbindlist(bestmatches1[[i]])))
+}
+
 
 ## Compare multiple sample approach to single sample approach
 blabla <- readMSData('kruiden/Kruid 126 Zwarte peper 1 191119me_66.mzXML', mode = 'onDisk')
@@ -96,7 +126,7 @@ blabla1[["onDiskData"]]@phenoData@data[["sample_name"]] <- blabla1[["onDiskData"
 blabla1[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
 blablaxcms <- mSet2xcmsSet(blabla1)
 blablaxsannotate <- xsAnnotate(blablaxcms)
-blablaxsannotate <- groupFWHM(blablaxsannotate, perfwhm = 3)
+blablaxsannotate <- groupFWHM(blablaxsannotate, perfwhm = 0.6)
 blablamsp <- to.msp(object = blablaxsannotate, file = NULL, settings = NULL, ndigit = 3, minfeat = 5, minintens = 0, intensity = "maxo", secs2mins = F)
 
 
@@ -196,10 +226,11 @@ similarity_scores <- similarities(msp_query = mspxcmslist, database = mona_msp, 
 # Get top x matches
 bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = splashmatches)
 
-
+{
 tophits <- function(similarity_scores, limit = 5, database, splashmatches, score_cutoff = 0.8) {
-  lapply(seq_along(similarity_scores), function(z){
-    indexes_per_sample <- vector(mode = 'list', length = length(similarity_scores))
+  totalmatches <- vector('list', length(similarity_scores))
+  totalmatches <- lapply(seq_along(similarity_scores), function(z){
+    indexes_per_sample <- vector(mode = 'list', length = length(similarity_scores[[z]]))
     indexes_per_sample <- lapply(seq_along(similarity_scores[[z]]), function(x){
       top5_scores <- sort(unlist(similarity_scores[[z]][[x]]), decreasing = T)[1:limit]
       top5_matches <- vector(mode = 'list', length = length(top5_scores))
@@ -213,13 +244,14 @@ tophits <- function(similarity_scores, limit = 5, database, splashmatches, score
       })
     })
     names(indexes_per_sample) <- c(seq_along(indexes_per_sample))
-    indexes_per_sample <- Filter(function(k) length(k) > 0, indexes_per_sample)
+    indexes_per_sample <- Filter(Negate(function(x) is.null(unlist(x))), indexes_per_sample)
   })
+  return(totalmatches)
 }
 
 
 similarities_thirdblocks <- function(nine_matches, msp_query, database) {
-  #' Calculate Spectrumsimilarity per SPLASH match
+  #' Calculate SpectrumSimilarity per SPLASH match
   # Loop through hits
   if (length(nine_matches) == 1) {
     msp_query <- list(msp_query)
@@ -227,7 +259,7 @@ similarities_thirdblocks <- function(nine_matches, msp_query, database) {
   if (.Platform$OS.type == 'windows') {
     num_cores <- detectCores()
     cl <- makeCluster(num_cores)
-    clusterExport(cl=cl, 'mona_msp')
+    clusterExport(cl=cl, c('database', 'msp_query'), envir = environment())
     allmatches <- vector(mode = 'list', length = length(nine_matches))
     allmatches <- lapply(seq_along(nine_matches), function(x) {
       matches_per_sample <- vector(mode = 'list', length = length(nine_matches[[x]]))
@@ -325,7 +357,7 @@ mSet2xcmsSet <-  function(mSet) {
   return(xs)
 }
 
-split_annotate <- function(mSet) {
+split_annotate <- function(mSet, perfwhm = 0.6) {
   #' This function splits the mSet object based on sample. 
   #' Subsequently this function groups the peaks into pseudospectra.
   f <- vector(mode = 'character', length = length(mSet$xcmsSet@phenoData$sample_name))
@@ -336,10 +368,10 @@ split_annotate <- function(mSet) {
   annotatedxcmslist <- vector(mode = 'list', length = length(f))
   annotatedxcmslist <- lapply(splitxcms, function(x){
     x <- xsAnnotate(x)
-    x <- groupFWHM(x, perfwhm = 3)
+    x <- groupFWHM(x, perfwhm = perfwhm)
   })
 }
-
+}
 
 
 

@@ -21,8 +21,7 @@ options(shiny.maxRequestSize=100*4096^2)
 # Preload MoNA_DB and SPLASH hashes
 mona_msp <- readRDS(file = 'data/mona_msp')
 mona_splashes <- readRDS(file = 'data/mona_splashes')
-# msetje <- readRDS(file = 'data/mset')
-# matchmatrix <- readRDS(file = 'data/matchestable')
+matches <- readRDS(file = 'data/matches')
 
 
 # Define UI.
@@ -103,7 +102,7 @@ ui <- dashboardPage(
                       actionButton(inputId = 'peakannotationrun', label = 'Perform peak annotation', width = '100%', style = 'margin-bottom:8px;'),
                       actionButton(inputId = 'paramdetectrun', HTML("Automatic parameter <br/>optimization"), width = '100%')
                   ),
-                    box(id =  'align_param_box', width = 6, collapsible = T, collapsed = T, closable = T,
+                    box(id =  'align_param_box', width = 6, collapsible = T, collapsed = F, closable = T,
                         style = "font-size:11px;",
                         title = 'Input parameters for peak alignment',
                         selectInput(inputId = 'rtmethod', label = 'Method', choices = list('loess' = 'loess', 'obiwarp' = 'obiwarp'),selected = 'loess'),
@@ -119,7 +118,7 @@ ui <- dashboardPage(
                             bsTooltip(id = 'prof_step', title = 'Prof step', placement = 'left', trigger = 'hover')),
                         # Grouping:
                         numericInput(inputId = 'bw', label = 'Bandwith', value = 10, min = 1),
-                        bsTooltip(id = 'bw', title = 'Standart deviation of the gaussian metapeak that groups peaks together.', placement = 'left', trigger = 'hover'),
+                        bsTooltip(id = 'bw', title = 'Standart deviation of the gaussian metapeak that groups peaks together.', placement = 'left', trigger = 'hover'), 
                         numericInput(inputId = 'min_fraction', label = 'minFraction', value = 0.5, min = 0),
                         bsTooltip(id = 'min_fraction', title = 'Minimal fraction of samples a feature has to be present in', placement = 'left', trigger = 'hover'),
                         numericInput(inputId = 'min_samples', label = 'minSamples', value = 1, min = 1),
@@ -221,34 +220,11 @@ server <- function(input, output, session){
       event_register("plotly_click")
     return(p)
     }
-    
-  create_xchr <- function(mSet) {
-    chr <- chromatogram(mSet[['onDiskData']])
-    xchr <- as(chr, 'XChromatograms')
-    chrompks <- mSet[["msFeatureData"]][["chromPeaks"]]
-    chrompkd <- mSet[["msFeatureData"]][["chromPeakData"]]
-    rt <- mSet[["msFeatureData"]][["adjustedRT"]]
-    samples <- factor(chrompks[, "sample"], levels = 1:length(fileNames(mSet$onDiskData)))
-    chrompks <- split.data.frame(chrompks, samples)
-    chrompkd <- split.data.frame(chrompkd, samples)
-    if (length(xchr) > 1) {
-      for (i in 1:length(xchr)) {
-        xchr[[i]]@rtime <- rt[[i]]
-        xchr[[i]]@chromPeaks <- chrompks[[i]]
-        xchr[[i]]@chromPeakData <- chrompkd[[i]]
-      }
-    } else {
-      for (i in 1:length(xchr)) {
-        xchr[[i]]@chromPeaks <- chrompks[[i]]
-        xchr[[i]]@chromPeakData <- chrompkd[[i]]
-      }
-    }
-    return(xchr)
-  }
   
   tophits <- function(similarity_scores, limit = 5, database, splashmatches, score_cutoff = 0.8) {
-    lapply(seq_along(similarity_scores), function(z){
-      indexes_per_sample <- vector(mode = 'list', length = length(similarity_scores))
+    totalmatches <- vector('list', length(similarity_scores))
+    totalmatches <- lapply(seq_along(similarity_scores), function(z){
+      indexes_per_sample <- vector(mode = 'list', length = length(similarity_scores[[z]]))
       indexes_per_sample <- lapply(seq_along(similarity_scores[[z]]), function(x){
         top5_scores <- sort(unlist(similarity_scores[[z]][[x]]), decreasing = T)[1:limit]
         top5_matches <- vector(mode = 'list', length = length(top5_scores))
@@ -262,8 +238,9 @@ server <- function(input, output, session){
         })
       })
       names(indexes_per_sample) <- c(seq_along(indexes_per_sample))
-      indexes_per_sample <- Filter(function(k) length(k) > 0, indexes_per_sample)
+      indexes_per_sample <- Filter(Negate(function(x) is.null(unlist(x))), indexes_per_sample)
     })
+    return(totalmatches)
   }
   
   similarities_thirdblocks <- function(nine_matches, msp_query, database) {
@@ -275,7 +252,7 @@ server <- function(input, output, session){
     if (.Platform$OS.type == 'windows') {
       num_cores <- detectCores()
       cl <- makeCluster(num_cores)
-      clusterExport(cl=cl, 'mona_msp')
+      clusterExport(cl=cl, 'database')
       allmatches <- vector(mode = 'list', length = length(nine_matches))
       allmatches <- lapply(seq_along(nine_matches), function(x) {
         matches_per_sample <- vector(mode = 'list', length = length(nine_matches[[x]]))
@@ -391,10 +368,11 @@ server <- function(input, output, session){
   
   }
   
+  
   # Create a reactive value object
   rvalues <- reactiveValues()
   
-  # rvalues$mSet <- msetje
+  rvalues$matches <- matches
   
   # Dynamically set parameters
   rvalues$parameters <- reactive({
@@ -473,11 +451,17 @@ server <- function(input, output, session){
   
   observeEvent(input$peakannotationrun, {
     updateBox('compoundbox', action = 'toggle')
-    mSet_xsannotate <- mSet2xcmsSet(rvalues$mSet)
-    mSet_xsannotate <- xsAnnotate(mSet_xsannotate)
-    mSet_xsannotate <- groupFWHM(mSet_xsannotate, perfwhm = input$perfwhm)
-    mSet_msp <- to.msp(object = mSet_xsannotate, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
-    querySPLASH <- get_splashscores(msp_list = list(mSet_msp))
+    if (length(input$data_input$datapath) == 1) {
+      mSet_xsannotate <- mSet2xcmsSet(rvalues$mSet)
+      mSet_xsannotate <- xsAnnotate(mSet_xsannotate)
+      mSet_xsannotate <- groupFWHM(mSet_xsannotate, perfwhm = input$perfwhm)
+      mSet_msp <- to.msp(object = mSet_xsannotate, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
+      querySPLASH <- get_splashscores(msp_list = list(mSet_msp))
+    } else {
+      xcmslist <-  split_annotate(mSet = rvalues$mSet)
+      mSet_msp <- lapply(xcmslist, to.msp, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
+      querySPLASH <- get_splashscores(msp_list = mSet_msp)
+    }
     full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
     full_mona_SPLASHES <- sapply(mona_msp, function(x){
       str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
@@ -487,10 +471,11 @@ server <- function(input, output, session){
     SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
     similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = mSet_msp, database = mona_msp)
     bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.8)
-    # matchmatrix <- t(data.table::rbindlist(bestmatches[[1]]))
+    matchmatrix <- t(data.table::rbindlist(bestmatches[[1]]))
     output$foundcompoundstable <- renderDT({
       datatable(matchmatrix, class = 'cell-border stripe')
     })
+    print(paste('Done with annotation'), length(bestmatches))
   })
   
   # Run peak detection
