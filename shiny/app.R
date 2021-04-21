@@ -22,7 +22,7 @@ options(shiny.maxRequestSize=100*4096^2)
 mona_msp <- readRDS(file = 'data/mona_msp')
 mona_splashes <- readRDS(file = 'data/mona_splashes')
 matches <- readRDS(file = 'data/matches')
-
+p <- readRDS(file = 'data/plot')
 
 # Define UI.
 # The front end of the webapp is created here.
@@ -206,11 +206,11 @@ ui <- dashboardPage(
 server <- function(input, output, session){
   ### functions
   {
-  plot_chrom_tic_bpc <- function(raw_data) {
+  plot_chrom_tic_bpc <- function(raw_data, tic_visibility = NULL) {
     plotData <- data.frame(scantime = rtime(raw_data), tic = tic(raw_data), bpc = bpi(raw_data))
     p <- plot_ly(source = "p") %>% 
       add_trace(data = plotData, x = ~scantime, y = ~tic, type = "scatter", mode = "lines", line = list(color = "rgba(0, 0, 0,0.7)", width = 0.8), 
-                text = ~paste(scantime, "s"), name = "<b>Total ion chromatogram</b>") %>% 
+                text = ~paste(scantime, "s"), visible = tic_visibility, name = "<b>Total ion chromatogram</b>") %>% 
       add_trace(data = plotData, x = ~scantime, y = ~bpc, type = "scatter", mode = "lines", line = list(color = "rgba(0, 215, 167,1)", width = 1.1), 
                 text = ~paste(round(bpc, 4), "m/z"), name = "<b>Base peak chromatogram</b>") %>% 
       layout(legend = list(x = 0.7, y = 0.99), 
@@ -219,7 +219,7 @@ server <- function(input, output, session){
              yaxis = list(title = "Counts", showgrid = FALSE, showticklabels = TRUE, zeroline = FALSE, showline = FALSE), hovermode = "x", showlegend = TRUE) %>% 
       event_register("plotly_click")
     return(p)
-    }
+  }
   
   tophits <- function(similarity_scores, limit = 5, database, splashmatches, score_cutoff = 0.8) {
     totalmatches <- vector('list', length(similarity_scores))
@@ -243,8 +243,9 @@ server <- function(input, output, session){
     return(totalmatches)
   }
   
+  
   similarities_thirdblocks <- function(nine_matches, msp_query, database) {
-    #' Calculate Spectrumsimilarity per SPLASH match
+    #' Calculate SpectrumSimilarity per SPLASH match
     # Loop through hits
     if (length(nine_matches) == 1) {
       msp_query <- list(msp_query)
@@ -252,7 +253,7 @@ server <- function(input, output, session){
     if (.Platform$OS.type == 'windows') {
       num_cores <- detectCores()
       cl <- makeCluster(num_cores)
-      clusterExport(cl=cl, 'database')
+      clusterExport(cl=cl, c('database', 'msp_query'), envir = environment())
       allmatches <- vector(mode = 'list', length = length(nine_matches))
       allmatches <- lapply(seq_along(nine_matches), function(x) {
         matches_per_sample <- vector(mode = 'list', length = length(nine_matches[[x]]))
@@ -350,29 +351,34 @@ server <- function(input, output, session){
     return(xs)
   }
   
-  split_annotate <- function(mSet) {
+  split_mSet <- function(mSet_object) {
     #' This function splits the mSet object based on sample. 
-    #' Subsequently this function groups the peaks into pseudospectra.
-    f <- vector(mode = 'character', length = length(mSet$xcmsSet@phenoData$sample_name))
-    f <- sapply(mSet$xcmsSet@phenoData$sample_name, function(x) {
+    f <- vector(mode = 'character', length = length(mSet_object[["xcmsSet"]]@phenoData[["sample_name"]]))
+    f <- sapply(mSet_object[["xcmsSet"]]@phenoData[["sample_name"]], function(x) {
       gsub(x = x, pattern = " ", replacement =  ".", fixed = T)
     })
-    splitxcms <- xcms:::split.xcmsSet(mSet$xcmsSet, f = factor(f))
-    annotatedxcmslist <- vector(mode = 'list', length = length(f))
-    annotatedxcmslist <- lapply(splitxcms, function(x){
+    splitxcms <- xcms:::split.xcmsSet(mSet_object[["xcmsSet"]], f = factor(f))
+    return(splitxcms)
+  }
+  
+  annotate_xcmslist <- function(xcmslist, perfwhm = 0.6){
+    #' This function groups the peaks into pseudospectra per sample.
+    annotatedxcmslist <- vector(mode = 'list', length = length(xcmslist))
+    annotatedxcmslist <- lapply(xcmslist, function(x){
       x <- xsAnnotate(x)
-      x <- groupFWHM(x, perfwhm = 3)
+      x <- groupFWHM(x, perfwhm = perfwhm)
     })
+    return(annotatedxcmslist)
   }
-  
-  
   }
-  
   
   # Create a reactive value object
   rvalues <- reactiveValues()
   
   rvalues$matches <- matches
+  
+  output$foundpeaks <- renderPlotly(p)
+  
   
   # Dynamically set parameters
   rvalues$parameters <- reactive({
@@ -423,12 +429,6 @@ server <- function(input, output, session){
       output$inspect_plot <- renderPlot(PerformDataInspect(input$data_input$datapath))
       }
     else {
-      # MSConvert_CMD <- paste0("docker run chambm/pwiz-skyline-i-agree-to-the-vendor-licenses wine msconvert ", input$data_input$datapath, " --mzXML")
-      # print(system('pwd'))
-      # print(system('${PWD}'))
-      # print(system('ls'))
-      # system(MSConvert_CMD)
-      # system('ls')
       rvalues$raw_data <- readMSData(files = input$data_input$datapath, mode = 'onDisk')
       output$inspect_plot <- renderPlotly(plot_chrom_tic_bpc(rvalues$raw_data))
       }
@@ -458,7 +458,7 @@ server <- function(input, output, session){
       mSet_msp <- to.msp(object = mSet_xsannotate, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
       querySPLASH <- get_splashscores(msp_list = list(mSet_msp))
     } else {
-      xcmslist <-  split_annotate(mSet = rvalues$mSet)
+      xcmslist <-  annotate_xcmslist(xcmslist = rvalues$xcmslist, perfwhm = input$perfwhm)
       mSet_msp <- lapply(xcmslist, to.msp, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
       querySPLASH <- get_splashscores(msp_list = mSet_msp)
     }
@@ -486,6 +486,10 @@ server <- function(input, output, session){
       mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
       mSet[["onDiskData"]]@phenoData@data[["sample_name"]] <- mSet[["onDiskData"]]@phenoData@data[["sampleNames"]]
       mSet[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
+      p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly')
+      p <- p %>% add_trace(data = data.frame(mSet$msFeatureData$chromPeaks), 
+                           x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
+                           name = paste(mSet$onDiskData@phenoData@data$sample_name, ' total peaks'))
     } else if(length(input$data_input$datapath) == 0) {
       showModal(modalDialog(
         title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
@@ -499,36 +503,41 @@ server <- function(input, output, session){
       mSet[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
       mSet <- PerformPeakAlignment(mSet, param = updateRawSpectraParam(params))
       mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(params))
+      xcmslist <-  split_mSet(mSet = mSet)
+      rvalues$xcmslist <- xcmslist
+      p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly')
+      for (i in seq_along(xcmslist)) {
+        p <- p %>% add_trace(data = data.frame(xcmslist[[i]]@peaks), 
+                             x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
+                             name = paste(xcmslist[[i]]@phenoData[["sample_name"]]))
+      }
     }
     rvalues$mSet <- mSet
     output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
-    p <- plot_chrom_tic_bpc(mSet$onDiskData)
-    p <- p %>% add_trace(data = data.frame(mSet$msFeatureData$chromPeaks), 
-                         x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
-                         name = paste(mSet$onDiskData@phenoData@data$sample_name, ' total peaks'))
     output$foundpeaks <- renderPlotly(p)
   })
   
   output$vsp <- renderPrint({
-    d <- event_data(event = "plotly_click", priority = "event", source = 'peakplot')
-    if (is.null(d)) "Click events appear here (double-click to clear)" 
-    else {
-      rvalues$mSet$msFeatureData$chromPeaks[which(rvalues$mSet$msFeatureData$chromPeaks[, 'rt'] == d$x),]
+    d <- event_data(event = "plotly_click", priority = "event", source = 'p')
+    if (!is.null(d) | length(rvalues$mSet$msFeatureData$chromPeaks[which(rvalues$mSet$msFeatureData$chromPeaks[, 'rt'] == d$x),]) == 0) {
+      "Click events appear here (double-click to clear)"
+    } else {
+      rvalues$mSet$msFeatureData$chromPeaks[which(rvalues$mSet$msFeatureData$chromPeaks[, 'rt'] == d$x), ]
     }
   })
   
-  output$mztabui <- renderUI({
-    d <- event_data(event = "plotly_click", priority = "event", source = 'peakplot')
-    if (!is.null(d)) {
-      pkinfo <- rvalues$mSet$msFeatureData$chromPeaks[rvalues$mSet$msFeatureData$chromPeaks[, 'rt'] == d$x,, drop = F]
-      nTabs = nrow(pkinfo)
-      myTabs <- lapply(paste('Tab', 1:nTabs), tabPanel, ... = plotOutput(outputId = paste('Plot', 1:nTabs)))
-      do.call(tabsetPanel, myTabs)
-      for (i in myTabs) {
-        NULL
-      }
-    }
-  })
+  # output$mztabui <- renderUI({
+  #   d <- event_data(event = "plotly_click", priority = "event", source = 'peakplot')
+  #   if (!is.null(d)) {
+  #     pkinfo <- rvalues$mSet$msFeatureData$chromPeaks[rvalues$mSet$msFeatureData$chromPeaks[, 'rt'] == d$x,, drop = F]
+  #     nTabs = nrow(pkinfo)
+  #     myTabs <- lapply(paste('Tab', 1:nTabs), tabPanel, ... = plotOutput(outputId = paste('Plot', 1:nTabs)))
+  #     do.call(tabsetPanel, myTabs)
+  #     for (i in myTabs) {
+  #       NULL
+  #     }
+  #   }
+  # })
   
   # Run automatic parameter detection and update page with new values. NOT DONE
   observeEvent(input$paramdetectrun, {
