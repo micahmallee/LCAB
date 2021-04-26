@@ -22,7 +22,6 @@ for (i in seq_along(xcmslist)) {
 p
 
 
-
 # Preload MoNA_DB and SPLASH hashes
 mona_msp <- readRDS(file = 'shiny/data/mona_msp')
 mona_splashes <- readRDS(file = 'shiny/data/mona_splashes')
@@ -31,6 +30,8 @@ system.time({
   ### Load data
   # test_data <- readMSData('test_data_mzxml/Test_nieuwe_kolom_MCX_SPE_KW1_Spike_18.mzXML', mode = 'onDisk')
   test_data <- readMSData('test_data_mzxml/converted/spike18.mzXML', mode = 'onDisk')
+  test_data@phenoData@data[["sample_name"]] <- test_data@phenoData@data[["sampleNames"]]
+  test_data@phenoData@data[["sampleNames"]] <- NULL
   # mona_msp <- read.msp('MoNA-export-GC-MS_Spectra.msp')
   # trimmed_test_data <- PerformDataTrimming(datapath = c("test_data_mzxml/"), rt.idx = 1, plot = F)
   # params_opt <- PerformParamsOptimization(raw_data = trimmed_test_data, param = SetPeakParam(platform = 'general', Peak_method = 'centWave'))
@@ -38,11 +39,9 @@ system.time({
   # p23 <- Noise_evaluate(test_data)
   params <- SetPeakParam(ppm = 22, noise = 10000, value_of_prefilter = 0.01, prefilter = 2, min_peakwidth = 1, max_peakwidth = 10, snthresh = 100)
   smSet_test_data <- PerformPeakPicking(test_data, param = updateRawSpectraParam(params))
-  smSet_test_data[["onDiskData"]]@phenoData@data[["sample_name"]] <- smSet_test_data[["onDiskData"]]@phenoData@data[["sampleNames"]]
-  smSet_test_data[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
+  test_data_xcms <- mSet2xcmsSet(smSet_test_data)
   
   ### Get pseudospectra and convert to msp format
-  test_data_xcms <- mSet2xcmsSet(smSet_test_data)
   test_data_xsannotate <- xsAnnotate(test_data_xcms)
   test_data_xsannotate <- groupFWHM(test_data_xsannotate, perfwhm = 0.6)
   test_data_msp <- to.msp(object = test_data_xsannotate, file = NULL, settings = NULL, ndigit = 0, minfeat = 3, minintens = 0, intensity = "maxo", secs2mins = F)
@@ -62,33 +61,34 @@ system.time({
   bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.6)
   matchmatrix <- t(data.table::rbindlist(bestmatches[[1]]))
 })
+
 p <- plot_chrom_tic_bpc(smSet_test_data$onDiskData, tic_visibility = 'legendonly')
-p <- p %>% add_trace(data = data.frame(test_data_xcms@peaks), 
-                     x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
+data1 <- data.frame(test_data_xcms@peaks)
+p <- p %>% add_trace(data = data1, 
+                     x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = rownames(data1), 
                      name = paste(test_data_xcms@phenoData$sample_name))
+
+
+
 p
 
 
-convertxsAnnotate <- function(object) {
-  truexsAnnotate <- new('xsAnnotate')
-  for (i in names(object$AnnotateObject)) {
-    slot(truexsAnnotate, i) <- object$AnnotateObject[[i]]
-  }
-  return(truexsAnnotate)
-}
 
-ok1 <- convertxsAnnotate(oke, jaa)
 
+
+
+pkinfo <- test_data_xcms@peaks[test_data_xcms@peaks[, 'rt'] == 71.2188,, drop = F]
+p1 <- test_data %>% filterRt(rt = c(pkinfo[, 4], pkinfo[, 4] + 0.0001)) %>% filterMz(mz = c(pkinfo[, 2], pkinfo[, 3])) %>% spectra
 
 
 
 ## Multiple samples
 msamples <- readMSData(c('mzxml/KRUID_126/Kruid 126 Zwarte peper 1 191119me_66.mzXML', 'mzxml/KRUID_131/Kruid 131 Zwarte peper 6 191119me_71.mzXML'), mode = 'onDisk')
+msamples@phenoData@data[["sample_name"]] <- msamples@phenoData@data[["sampleNames"]]
+msamples@phenoData@data[["sampleNames"]] <- NULL
 p24 <- Noise_evaluate(msamples)
-params2 <- SetPeakParam(ppm = p24$ppm, noise = p24$noise, value_of_prefilter = p24$value_of_prefilter, prefilter = p24$prefilter, min_peakwidth = 2, max_peakwidth = 8, snthresh = 100, mzdiff = 0.1)
+params2 <- SetPeakParam(ppm = p24$ppm, noise = 10000, value_of_prefilter = 10000, prefilter = p24$prefilter, min_peakwidth = 2, max_peakwidth = 8, snthresh = 1000, mzdiff = 0.1)
 smSet_msamples <- PerformPeakPicking(msamples, param = updateRawSpectraParam(params2))
-smSet_msamples[["onDiskData"]]@phenoData@data[["sample_name"]] <- smSet_msamples[["onDiskData"]]@phenoData@data[["sampleNames"]]
-smSet_msamples[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
 smSet_msamples <- PerformPeakAlignment(smSet_msamples, param = updateRawSpectraParam(params2))
 smSet_msamples <- PerformPeakFiling(smSet_msamples, param = updateRawSpectraParam(params2))
 xcmslist <-  split_mSet(mSet = smSet_msamples)
@@ -129,7 +129,7 @@ for (i in 1:length(bestmatches)) {
   }, silent = T)
 }
 
-
+{
 #' Spiked data:
 #' L-Valine, TMS derivative       andere splash
 #' Glycine, 3TMS derivative       half, wel .86 similarity, via MONA website wel!
@@ -189,8 +189,6 @@ Palmatic_acid_results <- compare_single_compound(Palmatic_acid_TMS, database = t
 
 silat_results <- compare_single_compound(compound = silat[[1]]$pspectrum, database = jamsp)
 
-
-
 compare_single_compound <- function(compound, database) {
   # compoundspectrum <- new('Spectrum2', mz = compound[, 1], intensity = compound[, 2])
   results <- vector(mode = 'list', length = length(database))
@@ -202,36 +200,39 @@ compare_single_compound <- function(compound, database) {
   return(results)
 }
 
-
 oke <- c(rbind(jamsp[[1]][, 1], jamsp[[1]][, 2]))
 oke <- c(rbind(test_data_msp[[14]][, 1], test_data_msp[[14]][, 2]))
-
-
-mona_secondblocks <- getsecondblocks(full_mona_splashes)
-querysplash <- getsplashscores(mspxcmslist)
-query_secondblocks <- getsecondblocks(querysplash)
-# Match secondblocks
-splashmatches <- matchsecondblocks(querysecondblocks = query_secondblocks, databasesecondblocks = mona_secondblocks)
-# Get similarity scores
-similarity_scores <- similarities(msp_query = mspxcmslist, database = mona_msp, SPLASH_hits = splashmatches)
-# Get top x matches
-bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = splashmatches)
+}
 
 {
 plot_chrom_tic_bpc <- function(raw_data, tic_visibility = NULL) {
-  plotData <- data.frame(scantime = rtime(raw_data), tic = tic(raw_data), bpc = bpi(raw_data))
-  p <- plot_ly(source = "p") %>% 
-    add_trace(data = plotData, x = ~scantime, y = ~tic, type = "scatter", mode = "lines", line = list(color = "rgba(0, 0, 0,0.7)", width = 0.8), 
-              text = ~paste(scantime, "s"), visible = tic_visibility, name = "<b>Total ion chromatogram</b>") %>% 
-    add_trace(data = plotData, x = ~scantime, y = ~bpc, type = "scatter", mode = "lines", line = list(color = "rgba(0, 215, 167,1)", width = 1.1), 
-              text = ~paste(round(bpc, 4), "m/z"), name = "<b>Base peak chromatogram</b>") %>% 
+  if (is.null(tic_visibility)) {
+    hovermode <- "x"
+  } else {
+    hovermode <- "closest"
+  }
+  samplenames <- raw_data@phenoData@data[["sample_name"]]
+  fdataPerSample <- split.data.frame(raw_data@featureData@data, raw_data@featureData@data$fileIdx)
+  cols <- RColorBrewer::brewer.pal(n = length(fdataPerSample) * 2, 'Paired')
+  p <- plot_ly(source = "p")
+  for (i in seq_along(fdataPerSample)) {
+    colindex <- if(i%%2 == 0) c(-i+1, -i) else c(i, i+1)
+    plotData <- data.frame(scantime = fdataPerSample[[i]]$retentionTime, tic = fdataPerSample[[i]]$totIonCurrent, bpc = fdataPerSample[[i]]$basePeakIntensity)
+    p <- p %>% 
+      add_trace(data = plotData, x = ~scantime, y = ~tic, type = "scatter", mode = "lines", line = list(color = cols[colindex[1]], width = 0.8), 
+                text = ~paste(scantime, "s"), visible = tic_visibility, name = paste("<b>Total ion chromatogram</b> ", samplenames[i])) %>% 
+      add_trace(data = plotData, x = ~scantime, y = ~bpc, type = "scatter", mode = "lines", line = list(color = cols[colindex[2]], width = 1.1), 
+                text = ~paste(round(bpc, 4), "m/z"), name = paste("<b>Base peak chromatogram</b> ", samplenames[i]))
+  }
+  p <- p %>% 
     layout(legend = list(x = 0.7, y = 0.99), 
            xaxis = list(title = "Scan time (s)", range = c(0, max(plotData$scantime)), showspikes = TRUE, spikemode = "toaxis+across", spikesnap = "data", 
                         showline = FALSE, zeroline = FALSE, spikedash = "solid", showgrid = TRUE), 
-           yaxis = list(title = "Counts", showgrid = FALSE, showticklabels = TRUE, zeroline = FALSE, showline = FALSE), hovermode = "x", showlegend = TRUE) %>% 
+           yaxis = list(title = "Counts", showgrid = FALSE, showticklabels = TRUE, zeroline = FALSE, showline = FALSE), hovermode = "closest", showlegend = TRUE) %>% 
     event_register("plotly_click")
   return(p)
 }
+  
   
 tophits <- function(similarity_scores, limit = 5, database, splashmatches, score_cutoff = 0.8) {
   totalmatches <- vector('list', length(similarity_scores))
@@ -383,23 +384,6 @@ annotate_xcmslist <- function(xcmslist, perfwhm = 0.6){
   return(annotatedxcmslist)
 }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

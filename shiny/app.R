@@ -22,6 +22,7 @@ options(shiny.maxRequestSize=100*4096^2)
 mona_msp <- readRDS(file = 'data/mona_msp')
 mona_splashes <- readRDS(file = 'data/mona_splashes')
 matches <- readRDS(file = 'data/matches')
+xcmsSetje <- readRDS(file = 'data/xcmsSetje')
 p <- readRDS(file = 'data/plot')
 
 # Define UI.
@@ -82,17 +83,17 @@ ui <- dashboardPage(
                   box(id = 'picking_param_box', width = 6, collapsible = T, collapsed = F,
                       style = "font-size:11px;",
                       title = 'Input parameters for peak picking',
-                      numericInput(inputId = 'ppm', label = 'ppm', value = NA, min = 0),
+                      numericInput(inputId = 'ppm', label = 'ppm', value = 25, min = 0),
                       bsTooltip(id = 'ppm', title = 'Maximum tolerated fluctuation of m/z value (ppm) from scan to scan - depends on the mass spectrometer accuracy', placement = 'right', trigger = 'hover'),
-                      numericInput(inputId = 'noise', label = 'Noise', value = 1000, min = 0),
+                      numericInput(inputId = 'noise', label = 'Noise', value = 10000, min = 0),
                       bsTooltip(id = 'noise', title = 'Each centroid must be greater than the "noise" intensity value', placement = 'right', trigger = 'hover'),
-                      numericInput(inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = 5, min = 0),
+                      numericInput(inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = 1, min = 0),
                       bsTooltip(id = 'min_peakwidth', title = 'Minimum peak width in seconds', placement = 'right', trigger = 'hover'),
                       numericInput(inputId = 'mz_diff', label = 'mz diff', value = 0.05, min = -0.01),
                       bsTooltip(id = 'mz_diff', title = 'Minimum difference in m/z for peaks with overlapping retention times, can be negative to allow overlap', placement = 'right', trigger = 'hover'),
-                      numericInput(inputId = 'max_peakwidth', label = 'Maximum peakwidth', value = 20, min = 0),
+                      numericInput(inputId = 'max_peakwidth', label = 'Maximum peakwidth', value = 10, min = 0),
                       bsTooltip(id = 'max_peakwidth', title = 'Maximum peak width in seconds', placement = 'right', trigger = 'hover'),
-                      numericInput(inputId = 'snthresh', label = 'Signal to noise threshold', value = 10, min = 0),
+                      numericInput(inputId = 'snthresh', label = 'Signal to noise threshold', value = 100, min = 0),
                       bsTooltip(id = 'snthresh', title = 'Signal to noise ratio cut-off (intensity)', placement = 'right', trigger = 'hover'),
                       numericInput(inputId = 'prefilter', label = 'Prefilter', value = 3, min = 0),
                       bsTooltip(id = 'prefilter', title = 'A peak must be present in x scans with an intensity greater than the value of the prefilter', placement = 'right', trigger = 'hover'),
@@ -158,12 +159,11 @@ ui <- dashboardPage(
                     plotlyOutput(outputId = 'foundpeaks')
                   ),
                   box(
+                    collapsible = T,
                     width = 12,
                     title = 'Selected peaks',
                     verbatimTextOutput(outputId = 'vsp'),
-                    uiOutput(outputId = 'mztabui')
-                    # tabsetPanel(id = "mztabs", 
-                    #             tabPanel('1', plotOutput('mzplot')))
+                    plotOutput(outputId = 'mzspectrum')
                   ),
                   box(
                     id = 'compoundbox',
@@ -207,16 +207,29 @@ server <- function(input, output, session){
   ### functions
   {
   plot_chrom_tic_bpc <- function(raw_data, tic_visibility = NULL) {
-    plotData <- data.frame(scantime = rtime(raw_data), tic = tic(raw_data), bpc = bpi(raw_data))
-    p <- plot_ly(source = "p") %>% 
-      add_trace(data = plotData, x = ~scantime, y = ~tic, type = "scatter", mode = "lines", line = list(color = "rgba(0, 0, 0,0.7)", width = 0.8), 
-                text = ~paste(scantime, "s"), visible = tic_visibility, name = "<b>Total ion chromatogram</b>") %>% 
-      add_trace(data = plotData, x = ~scantime, y = ~bpc, type = "scatter", mode = "lines", line = list(color = "rgba(0, 215, 167,1)", width = 1.1), 
-                text = ~paste(round(bpc, 4), "m/z"), name = "<b>Base peak chromatogram</b>") %>% 
+    if (is.null(tic_visibility)) {
+      hovermode <- "x"
+    } else {
+      hovermode <- "closest"
+    }
+    samplenames <- raw_data@phenoData@data[["sample_name"]]
+    fdataPerSample <- split.data.frame(raw_data@featureData@data, raw_data@featureData@data$fileIdx)
+    cols <- RColorBrewer::brewer.pal(n = length(fdataPerSample) * 2, 'Paired')
+    p <- plot_ly(source = "p")
+    for (i in seq_along(fdataPerSample)) {
+      colindex <- if(i%%2 == 0) c(-i+1, -i) else c(i, i+1)
+      plotData <- data.frame(scantime = fdataPerSample[[i]]$retentionTime, tic = fdataPerSample[[i]]$totIonCurrent, bpc = fdataPerSample[[i]]$basePeakIntensity)
+      p <- p %>% 
+        add_trace(data = plotData, x = ~scantime, y = ~tic, type = "scatter", mode = "lines", line = list(color = cols[colindex[1]], width = 0.8), 
+                  text = ~paste(scantime, "s"), visible = tic_visibility, name = paste("<b>Total ion chromatogram</b> ", samplenames[i])) %>% 
+        add_trace(data = plotData, x = ~scantime, y = ~bpc, type = "scatter", mode = "lines", line = list(color = cols[colindex[2]], width = 1.1), 
+                  text = ~paste(round(bpc, 4), "m/z"), name = paste("<b>Base peak chromatogram</b> ", samplenames[i]))
+    }
+    p <- p %>% 
       layout(legend = list(x = 0.7, y = 0.99), 
              xaxis = list(title = "Scan time (s)", range = c(0, max(plotData$scantime)), showspikes = TRUE, spikemode = "toaxis+across", spikesnap = "data", 
                           showline = FALSE, zeroline = FALSE, spikedash = "solid", showgrid = TRUE), 
-             yaxis = list(title = "Counts", showgrid = FALSE, showticklabels = TRUE, zeroline = FALSE, showline = FALSE), hovermode = "x", showlegend = TRUE) %>% 
+             yaxis = list(title = "Counts", showgrid = FALSE, showticklabels = TRUE, zeroline = FALSE, showline = FALSE), hovermode = "closest", showlegend = TRUE) %>% 
       event_register("plotly_click")
     return(p)
   }
@@ -376,13 +389,16 @@ server <- function(input, output, session){
   rvalues <- reactiveValues()
   
   rvalues$matches <- matches
-  
+  rvalues$xcmsSet <- xcmsSetje
+
+
+
   output$foundpeaks <- renderPlotly(p)
   
   
   # Dynamically set parameters
   rvalues$parameters <- reactive({
-    # req(input$upload_params)
+    req(input$upload_params)
     param_file <- input$upload_params 
     if (is.null(param_file)) {
       param_initial <- SetPeakParam('general', RT_method = 'loess')
@@ -430,6 +446,9 @@ server <- function(input, output, session){
       }
     else {
       rvalues$raw_data <- readMSData(files = input$data_input$datapath, mode = 'onDisk')
+      rvalues$raw_data@phenoData@data[["sampleNames"]] <- input$data_input[, 1]
+      rvalues$raw_data@phenoData@data[["sample_name"]] <- rvalues$raw_data@phenoData@data[["sampleNames"]]
+      rvalues$raw_data@phenoData@data[["sampleNames"]] <- NULL
       output$inspect_plot <- renderPlotly(plot_chrom_tic_bpc(rvalues$raw_data))
       }
     })
@@ -452,8 +471,7 @@ server <- function(input, output, session){
   observeEvent(input$peakannotationrun, {
     updateBox('compoundbox', action = 'toggle')
     if (length(input$data_input$datapath) == 1) {
-      mSet_xsannotate <- mSet2xcmsSet(rvalues$mSet)
-      mSet_xsannotate <- xsAnnotate(mSet_xsannotate)
+      mSet_xsannotate <- xsAnnotate(rvalues$xcmsSet)
       mSet_xsannotate <- groupFWHM(mSet_xsannotate, perfwhm = input$perfwhm)
       mSet_msp <- to.msp(object = mSet_xsannotate, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
       querySPLASH <- get_splashscores(msp_list = list(mSet_msp))
@@ -466,78 +484,79 @@ server <- function(input, output, session){
     full_mona_SPLASHES <- sapply(mona_msp, function(x){
       str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
     })
-    query_thirdblocks <- lapply(querySPLASH, get_blocks, blocknr = 3)
-    database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
-    SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
-    similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = mSet_msp, database = mona_msp)
-    bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.8)
-    matchmatrix <- t(data.table::rbindlist(bestmatches[[1]]))
-    output$foundcompoundstable <- renderDT({
-      datatable(matchmatrix, class = 'cell-border stripe')
-    })
-    print(paste('Done with annotation'), length(bestmatches))
+    # query_thirdblocks <- lapply(querySPLASH, get_blocks, blocknr = 3)
+    # database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
+    # SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
+    # similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = mSet_msp, database = mona_msp)
+    # bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.8)
+    # matchmatrix <- t(data.table::rbindlist(bestmatches[[1]]))
+    # output$foundcompoundstable <- renderDT({
+    #   datatable(matchmatrix, class = 'cell-border stripe')
+    # })
+    # print(paste('Done with annotation'), length(bestmatches))
   })
   
   # Run peak detection
   observeEvent(input$peakdetectrun, {
-    params <- SetPeakParam(platform = 'general', Peak_method = 'centWave', mzdiff = input$mz_diff, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
-                           snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
-    if (length(input$data_input$datapath) == 1) {
-      mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
-      mSet[["onDiskData"]]@phenoData@data[["sample_name"]] <- mSet[["onDiskData"]]@phenoData@data[["sampleNames"]]
-      mSet[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
-      p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly')
-      p <- p %>% add_trace(data = data.frame(mSet$msFeatureData$chromPeaks), 
-                           x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
-                           name = paste(mSet$onDiskData@phenoData@data$sample_name, ' total peaks'))
-    } else if(length(input$data_input$datapath) == 0) {
-      showModal(modalDialog(
-        title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
-        'Please upload data first.',
-        easyClose = T
-      ))
-      return()
-    } else {
-      mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
-      mSet[["onDiskData"]]@phenoData@data[["sample_name"]] <- mSet[["onDiskData"]]@phenoData@data[["sampleNames"]]
-      mSet[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
-      mSet <- PerformPeakAlignment(mSet, param = updateRawSpectraParam(params))
-      mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(params))
-      xcmslist <-  split_mSet(mSet = mSet)
-      rvalues$xcmslist <- xcmslist
-      p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly')
-      for (i in seq_along(xcmslist)) {
-        p <- p %>% add_trace(data = data.frame(xcmslist[[i]]@peaks), 
+    withProgress(message = 'Running peak detection', {
+      params <- SetPeakParam(platform = 'general', Peak_method = 'centWave', mzdiff = input$mz_diff, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
+                             snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
+      if (length(input$data_input$datapath) == 1) {
+        mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
+        xcmsSet <- mSet2xcmsSet(mSet)
+        p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly')
+        p <- p %>% add_trace(data = data.frame(xcmsSet@peaks), 
                              x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
-                             name = paste(xcmslist[[i]]@phenoData[["sample_name"]]))
+                             name = paste(xcmsSet@phenoData[["sample_name"]], ' total peaks'))
+        rvalues$xcmsSet <- xcmsSet
+      } else if(length(input$data_input$datapath) == 0) {
+        showModal(modalDialog(
+          title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
+          'Please upload data first.',
+          easyClose = T
+        ))
+        return()
+      } else {
+        mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
+        mSet <- PerformPeakAlignment(mSet, param = updateRawSpectraParam(params))
+        mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(params))
+        xcmslist <-  split_mSet(mSet = mSet)
+        rvalues$xcmslist <- xcmslist
+        p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly')
+        for (i in seq_along(xcmslist)) {
+          p <- p %>% add_trace(data = data.frame(xcmslist[[i]]@peaks), 
+                               x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
+                               name = paste(xcmslist[[i]]@phenoData[["sample_name"]]))
+        }
       }
-    }
-    rvalues$mSet <- mSet
-    output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
-    output$foundpeaks <- renderPlotly(p)
+      rvalues$mSet <- mSet
+      output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
+      output$foundpeaks <- renderPlotly(p)
+    })
   })
   
   output$vsp <- renderPrint({
     d <- event_data(event = "plotly_click", priority = "event", source = 'p')
-    if (!is.null(d) | length(rvalues$mSet$msFeatureData$chromPeaks[which(rvalues$mSet$msFeatureData$chromPeaks[, 'rt'] == d$x),]) == 0) {
+    if (is.null(d) | length(rvalues$xcmsSet@peaks[rvalues$xcmsSet@peaks[, 'rt'] == d$x, ]) == 0) {
       "Click events appear here (double-click to clear)"
     } else {
-      rvalues$mSet$msFeatureData$chromPeaks[which(rvalues$mSet$msFeatureData$chromPeaks[, 'rt'] == d$x), ]
+      rvalues$xcmsSet@peaks[rvalues$xcmsSet@peaks[, 'rt'] == d$x,, drop = F]
     }
   })
-  
-  # output$mztabui <- renderUI({
-  #   d <- event_data(event = "plotly_click", priority = "event", source = 'peakplot')
-  #   if (!is.null(d)) {
-  #     pkinfo <- rvalues$mSet$msFeatureData$chromPeaks[rvalues$mSet$msFeatureData$chromPeaks[, 'rt'] == d$x,, drop = F]
-  #     nTabs = nrow(pkinfo)
-  #     myTabs <- lapply(paste('Tab', 1:nTabs), tabPanel, ... = plotOutput(outputId = paste('Plot', 1:nTabs)))
-  #     do.call(tabsetPanel, myTabs)
-  #     for (i in myTabs) {
-  #       NULL
-  #     }
-  #   }
-  # })
+
+  output$mzspectrum <- renderPlot({
+    d <- event_data(event = "plotly_click", priority = "event", source = 'p')
+    print('click click')
+    if (!is.null(d) & length(rvalues$xcmsSet@peaks[which(rvalues$xcmsSet@peaks[, 'rt'] == d$x),]) != 0) {
+      shinyjs::show('mzspectrum')
+      pkinfo <- rvalues$xcmsSet@peaks[rvalues$xcmsSet@peaks[, 'rt'] == d$x,, drop = F]
+      print(pkinfo)
+      p1 <- rvalues$raw_data %>% filterRt(rt = c(pkinfo[, 4], pkinfo[, 4] + 0.0001)) %>% filterMz(mz = c(pkinfo[, 2], pkinfo[, 3])) %>% spectra
+      plot(p1[[1]])
+    } else {
+      shinyjs::hide('mzspectrum')
+    }
+  })
   
   # Run automatic parameter detection and update page with new values. NOT DONE
   observeEvent(input$paramdetectrun, {
