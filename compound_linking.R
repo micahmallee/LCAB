@@ -19,7 +19,34 @@ for (i in seq_along(xcmslist)) {
                        x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
                        name = paste(xcmslist[[i]]@xcmsSet@phenoData$sample_name))
 }
-p
+
+
+# two column matrix mz maxo
+
+plotiedata <- plotdata_pseudospectra(list(test_data_msp))
+
+plotdata_pseudospectra <- function(msps){
+  plotData <- vector(mode = 'list', length = length(msps))
+  for (i in seq_along(msps)){
+    pseudospectrum <- lapply(seq_along(msps[[i]]), function(x){
+      rt <- round(median(msps[[i]][[x]][, 3]), 4)
+      intense <- max(msps[[i]][[x]][, 2])
+      list(rt = rt, intense = intense, pspectra_id = x, sample_nr = i)
+    })
+    plotData[[i]] <- pseudospectrum
+  }
+  plotData <- lapply(plotData, data.table::rbindlist, use.names = T)
+  return(plotData)
+}
+
+for (i in seq_along(plotData)) {
+  p <- p %>% add_trace(data = plotData[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~pspectra_id, name = ~paste0('Pseudospectra: ', xcmslist[[i]]@xcmsSet@phenoData$sample_name))
+}
+
+
+
+plotData1 <- data.table::rbindlist(plotData, use.names = T)
+
 
 
 # Preload MoNA_DB and SPLASH hashes

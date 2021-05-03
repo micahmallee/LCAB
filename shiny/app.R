@@ -21,9 +21,11 @@ options(shiny.maxRequestSize=100*4096^2)
 # Preload MoNA_DB and SPLASH hashes
 mona_msp <- readRDS(file = 'data/mona_msp')
 mona_splashes <- readRDS(file = 'data/mona_splashes')
-matches <- readRDS(file = 'data/matches')
-xcmsSetje <- readRDS(file = 'data/xcmsSetje')
-p <- readRDS(file = 'data/plot')
+# msplist <- readRDS('data/msplist')
+# xcmslist <- readRDS('data/xcmslist')
+# smsetje <- readRDS('data/smsetje')
+# p <- readRDS('data/p')
+# plotData <- readRDS('data/plotData')
 
 # Define UI.
 # The front end of the webapp is created here.
@@ -42,10 +44,7 @@ ui <- dashboardPage(
     width = 330,
     sidebarMenu(collapsed = T,
       menuItem('Dashboard', tabName = 'dashboard', icon = icon('dashboard')),
-      menuItem('Peak detection', tabName = 'peakpicking', icon = icon('search')),
-      menuItem('Clustering', tabName = 'clustering', icon = icon('align-center')),
-      menuItem('Metabolite Set Enrichment Analysis', tabName = 'msea', icon = icon('align-center')),
-      menuItem('Statistical analysis', tabName = 'statistics', icon = icon('align-center'))
+      menuItem('Peak detection', tabName = 'peakpicking', icon = icon('search'))
     )
   ),
   # Main content
@@ -69,7 +68,7 @@ ui <- dashboardPage(
                 column(width = 9,
                        box(
                          width = 12,
-                         plotlyOutput(outputId = 'inspect_plot') # %>% withSpinner()
+                         plotlyOutput(outputId = 'inspect_plot')
                        ),
                        box(
                          width = 12,
@@ -101,6 +100,7 @@ ui <- dashboardPage(
                       bsTooltip(id = 'v_prefilter', title = 'Value of prefilter', placement = 'right', trigger = 'hover'),
                       actionButton(inputId = 'peakdetectrun', label = 'Perform peak detection', width = '100%', style = 'margin-bottom:8px;'),
                       actionButton(inputId = 'peakannotationrun', label = 'Perform peak annotation', width = '100%', style = 'margin-bottom:8px;'),
+                      actionButton(inputId = 'createpspectra', label = 'Create and show pseudospectra', width = '100%', style = 'margin-bottom:8px;'),
                       actionButton(inputId = 'paramdetectrun', HTML("Automatic parameter <br/>optimization"), width = '100%')
                   ),
                     box(id =  'align_param_box', width = 6, collapsible = T, collapsed = F, closable = T,
@@ -151,20 +151,25 @@ ui <- dashboardPage(
                 ),
                 column(
                   width = 8,
-                  box(
-                    width = 12,
-                    title = 'Results', 
-                    textOutput(outputId = 'peakamount'),
-                    textOutput(outputId = 'matches'),
-                    plotlyOutput(outputId = 'foundpeaks')
-                  ),
-                  box(
-                    collapsible = T,
-                    width = 12,
-                    title = 'Selected peaks',
-                    verbatimTextOutput(outputId = 'vsp'),
-                    plotOutput(outputId = 'mzspectrum')
-                  ),
+                  tabBox(id = 'plottabbox', 
+                         width = 12,
+                         tabPanel(title = 'Found peaks',
+                                  textOutput(outputId = 'peakamount'),
+                                  plotlyOutput(outputId = 'foundpeaks'))
+                         # shinyjs::hidden(div(id = 'createdpspectra',
+                         #                     tabPanel(
+                         #   title = 'Created pseudospectra',
+                         #   plotlyOutput(outputId = 'foundpseudospectra')
+                         # )))
+                         ),
+                  shinyjs::hidden(div(id = 'selectedbox',
+                                      box(
+                                          collapsible = T,
+                                          width = 12,
+                                          title = 'Selected',
+                                          shinyjs::hidden(verbatimTextOutput(outputId = 'vsp')),
+                                          shinyjs::hidden(plotOutput(outputId = 'mzspectrum'))
+                  ))),
                   box(
                     id = 'compoundbox',
                     collapsible = T,
@@ -175,29 +180,11 @@ ui <- dashboardPage(
                     class = 'cell-border stripe',
                     DTOutput(outputId = 'foundcompoundstable') %>% withSpinner()
                   ))
-                )),
-      tabItem('clustering',
-              fluidRow(
-                box(
-                  title = 'Clustertabitem'
-                )
-              )),
-      tabItem('statistics',
-              fluidRow(
-                box(
-                  title = 'Statistical analysis tabitem'
-                )
-              )),
-      tabItem('msea',
-              fluidRow(
-                box(
-                  title = 'MSEA tabitem'
-                )
-              ))
+                ))
     )
   ),
   footer = dashboardFooter(
-    left = 'MetabOracle 0.4',
+    left = 'MetabOracle 0.6',
     right = 'Made by Micah Mallée'
   )
 )
@@ -206,7 +193,21 @@ ui <- dashboardPage(
 server <- function(input, output, session){
   ### functions
   {
-  plot_chrom_tic_bpc <- function(raw_data, tic_visibility = NULL) {
+  plotdata_pseudospectra <- function(msps){
+    plotData <- vector(mode = 'list', length = length(msps))
+    for (i in seq_along(msps)){
+      pseudospectrum <- lapply(seq_along(msps[[i]]), function(x){
+        rt <- round(median(msps[[i]][[x]][, 3]), 4)
+        intense <- max(msps[[i]][[x]][, 2])
+        list(rt = rt, intense = intense, pspectra_id = x, sample_nr = i)
+      })
+      plotData[[i]] <- pseudospectrum
+    }
+    plotData <- lapply(plotData, data.table::rbindlist, use.names = T)
+    return(plotData)
+  }
+    
+  plot_chrom_tic_bpc <- function(raw_data, tic_visibility = NULL, source = NULL) {
     if (is.null(tic_visibility)) {
       hovermode <- "x"
     } else {
@@ -215,7 +216,7 @@ server <- function(input, output, session){
     samplenames <- raw_data@phenoData@data[["sample_name"]]
     fdataPerSample <- split.data.frame(raw_data@featureData@data, raw_data@featureData@data$fileIdx)
     cols <- RColorBrewer::brewer.pal(n = length(fdataPerSample) * 2, 'Paired')
-    p <- plot_ly(source = "p")
+    p <- plot_ly(source = source)
     for (i in seq_along(fdataPerSample)) {
       colindex <- if(i%%2 == 0) c(-i+1, -i) else c(i, i+1)
       plotData <- data.frame(scantime = fdataPerSample[[i]]$retentionTime, tic = fdataPerSample[[i]]$totIonCurrent, bpc = fdataPerSample[[i]]$basePeakIntensity)
@@ -388,12 +389,11 @@ server <- function(input, output, session){
   # Create a reactive value object
   rvalues <- reactiveValues()
   
-  rvalues$matches <- matches
-  rvalues$xcmsSet <- xcmsSetje
-
-
-
-  output$foundpeaks <- renderPlotly(p)
+  # rvalues$xcmslist <- xcmslist
+  # rvalues$msplist <- msplist
+  # rvalues$smsetje <- smsetje
+  # 
+  # output$foundpeaks <- renderPlotly(p)
   
   
   # Dynamically set parameters
@@ -438,6 +438,7 @@ server <- function(input, output, session){
   
   # Run button (upload vs inspect) check radiobutton, then run accordingly
   observeEvent(input$run, {
+    req(input$data_input$datapath)
     progress <- shiny::Progress$new()
     on.exit(progress$close())
     progress$set(message = "Creating plot", value = 10)
@@ -449,7 +450,7 @@ server <- function(input, output, session){
       rvalues$raw_data@phenoData@data[["sampleNames"]] <- input$data_input[, 1]
       rvalues$raw_data@phenoData@data[["sample_name"]] <- rvalues$raw_data@phenoData@data[["sampleNames"]]
       rvalues$raw_data@phenoData@data[["sampleNames"]] <- NULL
-      output$inspect_plot <- renderPlotly(plot_chrom_tic_bpc(rvalues$raw_data))
+      output$inspect_plot <- renderPlotly(plot_chrom_tic_bpc(rvalues$raw_data, source = NULL))
       }
     })
   
@@ -468,32 +469,33 @@ server <- function(input, output, session){
     }
   })
   
+  
   observeEvent(input$peakannotationrun, {
-    updateBox('compoundbox', action = 'toggle')
-    if (length(input$data_input$datapath) == 1) {
-      mSet_xsannotate <- xsAnnotate(rvalues$xcmsSet)
-      mSet_xsannotate <- groupFWHM(mSet_xsannotate, perfwhm = input$perfwhm)
-      mSet_msp <- to.msp(object = mSet_xsannotate, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
-      querySPLASH <- get_splashscores(msp_list = list(mSet_msp))
-    } else {
-      xcmslist <-  annotate_xcmslist(xcmslist = rvalues$xcmslist, perfwhm = input$perfwhm)
-      mSet_msp <- lapply(xcmslist, to.msp, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
-      querySPLASH <- get_splashscores(msp_list = mSet_msp)
+    if (is.null(rvalues$xcmsSet) & is.null(rvalues$xcmslist)) {
+      showModal(modalDialog(
+        title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
+        'Please run peak detection first.',
+        easyClose = T
+      ))
+      return()
     }
-    full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
-    full_mona_SPLASHES <- sapply(mona_msp, function(x){
-      str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
+    withProgress(message = 'Running peak annotation', {
+      updateBox('compoundbox', action = 'toggle')
+      full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
+      full_mona_SPLASHES <- sapply(mona_msp, function(x){
+        str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
+      })
+      query_thirdblocks <- lapply(querySPLASH, get_blocks, blocknr = 3)
+      database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
+      SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
+      similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = mSet_msp, database = mona_msp)
+      bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.8)
+      matchmatrix <- t(data.table::rbindlist(bestmatches[[1]]))
+      output$foundcompoundstable <- renderDT({
+        datatable(matchmatrix, class = 'cell-border stripe')
+      })
+      print(paste('Done with annotation'), length(bestmatches))
     })
-    # query_thirdblocks <- lapply(querySPLASH, get_blocks, blocknr = 3)
-    # database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
-    # SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
-    # similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = mSet_msp, database = mona_msp)
-    # bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.8)
-    # matchmatrix <- t(data.table::rbindlist(bestmatches[[1]]))
-    # output$foundcompoundstable <- renderDT({
-    #   datatable(matchmatrix, class = 'cell-border stripe')
-    # })
-    # print(paste('Done with annotation'), length(bestmatches))
   })
   
   # Run peak detection
@@ -504,7 +506,7 @@ server <- function(input, output, session){
       if (length(input$data_input$datapath) == 1) {
         mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
         xcmsSet <- mSet2xcmsSet(mSet)
-        p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly')
+        p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly', source = 'p')
         p <- p %>% add_trace(data = data.frame(xcmsSet@peaks), 
                              x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
                              name = paste(xcmsSet@phenoData[["sample_name"]], ' total peaks'))
@@ -522,7 +524,7 @@ server <- function(input, output, session){
         mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(params))
         xcmslist <-  split_mSet(mSet = mSet)
         rvalues$xcmslist <- xcmslist
-        p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly')
+        p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly', source = 'p')
         for (i in seq_along(xcmslist)) {
           p <- p %>% add_trace(data = data.frame(xcmslist[[i]]@peaks), 
                                x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
@@ -535,31 +537,77 @@ server <- function(input, output, session){
     })
   })
   
-  output$vsp <- renderPrint({
+  
+  observeEvent(event_data(event = "plotly_click", priority = "event", source = 'p'), {
+    shinyjs::show(id = 'selectedbox', anim = T)
     d <- event_data(event = "plotly_click", priority = "event", source = 'p')
-    if (is.null(d) | length(rvalues$xcmsSet@peaks[rvalues$xcmsSet@peaks[, 'rt'] == d$x, ]) == 0) {
-      "Click events appear here (double-click to clear)"
+    if (is.null(d)) {
+      return(NULL)
     } else {
-      rvalues$xcmsSet@peaks[rvalues$xcmsSet@peaks[, 'rt'] == d$x,, drop = F]
+      shinyjs::show(id = 'vsp', anim = T, animType = 'fade')
+      shinyjs::hide(id = 'mzspectrum', anim = T, animType = 'slide')
+      output$vsp <- renderPrint(rvalues$xcmsSet@peaks[rvalues$xcmsSet@peaks[, 'rt'] == d$x,, drop = F])
     }
   })
 
-  output$mzspectrum <- renderPlot({
-    d <- event_data(event = "plotly_click", priority = "event", source = 'p')
-    print('click click')
-    if (!is.null(d) & length(rvalues$xcmsSet@peaks[which(rvalues$xcmsSet@peaks[, 'rt'] == d$x),]) != 0) {
-      shinyjs::show('mzspectrum')
-      pkinfo <- rvalues$xcmsSet@peaks[rvalues$xcmsSet@peaks[, 'rt'] == d$x,, drop = F]
-      print(pkinfo)
-      p1 <- rvalues$raw_data %>% filterRt(rt = c(pkinfo[, 4], pkinfo[, 4] + 0.0001)) %>% filterMz(mz = c(pkinfo[, 2], pkinfo[, 3])) %>% spectra
-      plot(p1[[1]])
+  rvalues$checked <- NULL
+  
+  
+  observeEvent(input$createpspectra, {
+    if (length(input$data_input$datapath) == 1) {
+      mSet_xsannotate <- xsAnnotate(rvalues$xcmsSet)
+      mSet_xsannotate <- groupFWHM(mSet_xsannotate, perfwhm = input$perfwhm)
+      mSet_msp <- to.msp(object = mSet_xsannotate, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
+      mSet_msp <- list(mSet_msp)
+      querySPLASH <- get_splashscores(msp_list = mSet_msp)
     } else {
-      shinyjs::hide('mzspectrum')
+      xcmslist <-  annotate_xcmslist(xcmslist = rvalues$xcmslist, perfwhm = input$perfwhm)
+      mSet_msp <- lapply(xcmslist, to.msp, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
+      querySPLASH <- get_splashscores(msp_list = mSet_msp)
     }
+    if (is.null(rvalues$checked)) {
+      appendTab(inputId = 'plottabbox', tab = tabPanel(title = 'Created pseudospectra', plotlyOutput('foundpseudospectra')), select = T)
+      rvalues$checked <- T
+    } 
+    rvalues$mSet_msp <- mSet_msp
+    p1 <- plot_chrom_tic_bpc(rvalues$mSet$onDiskData, tic_visibility = 'legendonly', source = 'p1')
+    plotData <- plotdata_pseudospectra(msps = mSet_msp)
+    rvalues$plotData <- plotData
+    for (i in seq_along(plotData)) {
+      p1 <- p1 %>% add_trace(data = plotData[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~pspectra_id, name = ~paste0('Pseudospectra: ', names(mSet_msp)[i]))
+    }
+    output$foundpseudospectra <- renderPlotly(p1)
   })
+  
+  
+  # When a pseudospectrum is clicked on, this piece of code shows the underlying 
+  # mass spectrum.
+  observeEvent(event_data(event = "plotly_click", source = 'p1'), {
+    shinyjs::show(id = 'selectedbox', anim = T)
+    d1 <- event_data(event = "plotly_click", source = 'p1')
+    plotData1 <- data.table::rbindlist(rvalues$plotData, use.names = T)
+    plotData1 %>%
+      filter(rt %in% d1$x) -> ja
+    if (nrow(ja) == 0) {
+      shinyjs::hide(id = 'mzspectrum')
+      return(NULL)
+      }
+    shinyjs::show(id = 'mzspectrum', anim = T, animType = 'fade', asis = T)
+    shinyjs::hide(id = 'vsp')
+    output$mzspectrum <- renderPlot(plotPseudoSpectrum(rvalues$mSet_msp[[ja$sample_nr]][[ja$pspectra_id]][, 1:2]))
+  })
+  
   
   # Run automatic parameter detection and update page with new values. NOT DONE
   observeEvent(input$paramdetectrun, {
+    if(length(input$data_input$datapath) == 0) {
+      showModal(modalDialog(
+        title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
+        'Please upload data first.',
+        easyClose = T
+      ))
+      return()
+    }
     param_initial <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
                                 snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter, mzdiff = input$mz_diff)
     rvalues$optimized_params <- PerformParamsOptimization(raw_data = subset_raw_data, param = param_initial, ncore = 8)
@@ -581,8 +629,7 @@ server <- function(input, output, session){
     content = function(file) {
       param_initial <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = input$rtmethod, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
                                             snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter, mzdiff = input$mz_diff)
-      # save(param_initial, file = file)
-      save(rvalues$mSet, file = file)
+      save(param_initial, file = file)
     }
   )
 }
