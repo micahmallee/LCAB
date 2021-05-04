@@ -2,6 +2,7 @@ library(shiny)
 library(shinyBS)
 library(shinydashboard)
 library(shinydashboardPlus)
+library(shinyFiles)
 library(shinycssloaders)
 library(shinyjs)
 library(DT)
@@ -63,7 +64,9 @@ ui <- dashboardPage(
                                  choices = list('Inspect' = 1,
                                                 'Upload' = 2),
                                  selected = 2, inline = T),
-                    actionButton(inputId = 'run', label = 'Run')
+                    actionButton(inputId = 'run', label = 'Run'),
+                    shinyDirButton('dir', ' input directory', 'Upload'),
+                    verbatimTextOutput('dir', placeholder = T)
                   )),
                 column(width = 9,
                        box(
@@ -395,6 +398,28 @@ server <- function(input, output, session){
   # 
   # output$foundpeaks <- renderPlotly(p)
   
+  shinyDirChoose(input, 'dir', roots = c(home = '~'), filetypes = c('', 'mzxml', 'mzXML'))
+  
+  global <- reactiveValues(datapath = getwd())
+  
+  dir <- reactive(input$dir)
+  
+  
+  
+  output$dir <- renderText({
+    global$datapath
+  })
+  
+  observeEvent(ignoreNULL = TRUE,
+               eventExpr = {
+                 input$dir
+               },
+               handlerExpr = {
+                 if (!"path" %in% names(dir())) return()
+                 home <- normalizePath("~")
+                 global$datapath <-
+                   file.path(home, paste(unlist(dir()$path[-1]), collapse = .Platform$file.sep))
+               })
   
   # Dynamically set parameters
   rvalues$parameters <- reactive({
