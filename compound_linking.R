@@ -11,7 +11,10 @@ in_path <- 'c://Users/Micah/Documents/LCAB/test_data_mzxml/raw/spike18.raw'
 MSConvert_CMD <- paste0("docker run --rm -v `pwd`:`pwd` -w `pwd` chambm/pwiz-skyline-i-agree-to-the-vendor-licenses wine msconvert ", in_path, " --mzXML")
 system(MSConvert_CMD)
 
-rhino <- readMSData(files = list.files('rhino_mzxml/Regular/', full.names = T), mode = 'inMemory', msLevel. = 1)
+rhino <- readMSData(files = list.files('rhino_data/params/', full.names = T), mode = 'inMemory', msLevel. = 1)
+rhino_trimmed <- PerformDataTrimming( datapath = 'rhino_data/params', plot = SetPlotParam(Plot = F), write = T, rt.idx = 1)
+raw <- ImportRawMSData(foldername = 'rhino_data/params', mode = 'inMemory', plotSettings = SetPlotParam(Plot = F))
+
 
 p <- plot_chrom_tic_bpc(smSet_msamples$onDiskData, tic_visibility = 'legendonly')
 for (i in seq_along(xcmslist)) {
