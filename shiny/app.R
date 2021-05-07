@@ -58,26 +58,47 @@ ui <- dashboardPage(
                   box(width = 12,
                     title = 'Load data',
                     helpText("Welcome to MetabOracle! Please upload your mzXML/mzML/netCDF data below."),
-                    fileInput(inputId = 'data_input', label = 'Select your file(s):', multiple = T, accept = c('.mzXML', 'mzxml', '.CDF', '.cdf', '.mzml', 'mzML')),
                     # sliderInput(inputId = 'rt.idx', label = 'rt.idx', min = 0, max = 1, step = 0.1, value = 0.6),
+                    checkboxInput(
+                      inputId = 'directory_flag',
+                      label = 'Directory path?',
+                      value = FALSE
+                    ),
+                    
+                    conditionalPanel(
+                      "input.directory_flag == 0",
+                      shinyFilesButton(
+                        id = "infile",
+                        label = "Choose file(s)",
+                        title = "Choose one or more files",
+                        multiple = TRUE
+                      )
+                    ),
+                    conditionalPanel(
+                      "input.directory_flag == 1",
+                      shinyDirButton(id = "indir", label = "Choose directory", title = "Choose a directory")
+                    ),
+                    
+                    verbatimTextOutput('filepaths'),
+                    
                     radioButtons(inputId = 'inspect_trim', label = 'Inspect or upload data.',
                                  choices = list('Inspect' = 1,
                                                 'Upload' = 2),
                                  selected = 2, inline = T),
-                    actionButton(inputId = 'run', label = 'Run'),
-                    shinyDirButton('dir', ' input directory', 'Upload'),
-                    verbatimTextOutput('dir', placeholder = T)
+                    actionButton(inputId = 'run', label = 'Run')
+                    
                   )),
                 column(width = 9,
                        box(
                          width = 12,
                          plotlyOutput(outputId = 'inspect_plot')
-                       ),
-                       box(
-                         width = 12,
-                         title = 'File information:',
-                         tableOutput(outputId = 'file') 
-                       )))),
+                       )
+                       # box(
+                       #   width = 12,
+                       #   title = 'File information:',
+                       #   tableOutput(outputId = 'file') 
+                       # )
+                       ))),
       tabItem('peakpicking',
               fluidRow(
                 column(
@@ -398,28 +419,36 @@ server <- function(input, output, session){
   # 
   # output$foundpeaks <- renderPlotly(p)
   
-  shinyDirChoose(input, 'dir', roots = c(home = '~'), filetypes = c('', 'mzxml', 'mzXML'))
+  volumes <- c(Home = fs::path_home(), "R Installation" = R.home(), getVolumes()())
   
-  global <- reactiveValues(datapath = getwd())
+  shinyFileChoose(
+    input,
+    'infile',
+    roots = volumes
+  )
   
-  dir <- reactive(input$dir)
+  shinyDirChoose(
+    input,
+    'indir',
+    roots = volumes
+  )
   
   
-  
-  output$dir <- renderText({
-    global$datapath
+  output$filepaths <- renderText({
+    if (!is.integer(input$infile)) {
+      filelocation <- parseFilePaths(volumes, input$infile)
+      rvalues$data_input <- filelocation
+      rvalues$dir_or_file <- length(filelocation$datapath)
+      rvalues$data_input$datapath
+    } else if (!is.integer(input$indir)) {
+      dirlocation <- parseDirPath(volumes, input$indir)
+      rvalues$data_input <- dirlocation
+      dirlocation
+    } else {
+      'No files have been selected'
+    }
   })
   
-  observeEvent(ignoreNULL = TRUE,
-               eventExpr = {
-                 input$dir
-               },
-               handlerExpr = {
-                 if (!"path" %in% names(dir())) return()
-                 home <- normalizePath("~")
-                 global$datapath <-
-                   file.path(home, paste(unlist(dir()$path[-1]), collapse = .Platform$file.sep))
-               })
   
   # Dynamically set parameters
   rvalues$parameters <- reactive({
@@ -459,24 +488,28 @@ server <- function(input, output, session){
   })
   
   
-  output$file <- renderTable(input$data_input[, 1:2])
-  
   # Run button (upload vs inspect) check radiobutton, then run accordingly
   observeEvent(input$run, {
-    req(input$data_input$datapath)
+    req(rvalues$data_input)
     progress <- shiny::Progress$new()
     on.exit(progress$close())
     progress$set(message = "Creating plot", value = 10)
     if(input$inspect_trim == 1){
-      output$inspect_plot <- renderPlot(PerformDataInspect(input$data_input$datapath))
-      }
+      output$inspect_plot <- renderPlot(PerformDataInspect(rvalues$data_input))
+    }
     else {
-      rvalues$raw_data <- readMSData(files = input$data_input$datapath, mode = 'onDisk')
-      rvalues$raw_data@phenoData@data[["sampleNames"]] <- input$data_input[, 1]
-      rvalues$raw_data@phenoData@data[["sample_name"]] <- rvalues$raw_data@phenoData@data[["sampleNames"]]
-      rvalues$raw_data@phenoData@data[["sampleNames"]] <- NULL
-      output$inspect_plot <- renderPlotly(plot_chrom_tic_bpc(rvalues$raw_data, source = NULL))
+      if(is.null(rvalues$dir_or_file)) {
+        rvalues$raw_data <- ImportRawMSData(foldername = rvalues$data_input, mode = 'onDisk', ncores = detectCores(), plotSettings = SetPlotParam(Plot = F))
+      } else {
+        sample_names <- c(rvalues$data_input$datapath)
+        sample_names <- gsub("^.*/", "", sample_names)
+        rvalues$raw_data <- readMSData(files = c(rvalues$data_input$datapath), mode = 'onDisk')
+        rvalues$raw_data@phenoData@data[["sampleNames"]] <- sample_names
+        rvalues$raw_data@phenoData@data[["sample_name"]] <- rvalues$raw_data@phenoData@data[["sampleNames"]]
+        rvalues$raw_data@phenoData@data[["sampleNames"]] <- NULL
       }
+      output$inspect_plot <- renderPlotly(plot_chrom_tic_bpc(rvalues$raw_data, source = NULL))
+    }
     })
   
   # Check amount of samples. If less than 2, do not show alignment parameters
@@ -528,7 +561,7 @@ server <- function(input, output, session){
     withProgress(message = 'Running peak detection', {
       params <- SetPeakParam(platform = 'general', Peak_method = 'centWave', mzdiff = input$mz_diff, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
                              snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
-      if (length(input$data_input$datapath) == 1) {
+      if (rvalues$dir_or_file == 1) {
         mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
         xcmsSet <- mSet2xcmsSet(mSet)
         p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly', source = 'p')
@@ -536,14 +569,14 @@ server <- function(input, output, session){
                              x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
                              name = paste(xcmsSet@phenoData[["sample_name"]], ' total peaks'))
         rvalues$xcmsSet <- xcmsSet
-      } else if(length(input$data_input$datapath) == 0) {
+      } else if(is.null(rvalues$raw_data)) {
         showModal(modalDialog(
           title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
           'Please upload data first.',
           easyClose = T
         ))
         return()
-      } else {
+      } else if(input$dir_or_file > 1){
         mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
         mSet <- PerformPeakAlignment(mSet, param = updateRawSpectraParam(params))
         mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(params))
@@ -555,6 +588,8 @@ server <- function(input, output, session){
                                x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
                                name = paste(xcmslist[[i]]@phenoData[["sample_name"]]))
         }
+      } else {
+        NULL
       }
       rvalues$mSet <- mSet
       output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
@@ -625,7 +660,7 @@ server <- function(input, output, session){
   
   # Run automatic parameter detection and update page with new values. NOT DONE
   observeEvent(input$paramdetectrun, {
-    if(length(input$data_input$datapath) == 0) {
+    if(!is.null(rvalues$dir_or_file)) {
       showModal(modalDialog(
         title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
         'Please upload data first.',
@@ -633,9 +668,10 @@ server <- function(input, output, session){
       ))
       return()
     }
+    memory_raw_data <- ImportRawMSData(foldername = rvalues$data_input, mode = 'inMemory', ncores = detectCores(), plotSettings = SetPlotParam(Plot = F))
     param_initial <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
                                 snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter, mzdiff = input$mz_diff)
-    rvalues$optimized_params <- PerformParamsOptimization(raw_data = subset_raw_data, param = param_initial, ncore = 8)
+    rvalues$optimized_params <- PerformParamsOptimization(raw_data = memory_raw_data, param = param_initial, ncore = detectCores())
     updateNumericInput(session = session, inputId = 'ppm', label = 'ppm', value = rvalues$optimized_params$best_parameters$ppm , min = 0)
     updateNumericInput(session = session, inputId = 'noise', label = 'Noise', value = rvalues$optimized_params$best_parameters$noise, min = 0)
     updateNumericInput(session = session, inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = rvalues$optimized_params$best_parameters$min_peakwidth, min = 0)
