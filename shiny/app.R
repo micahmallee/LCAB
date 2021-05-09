@@ -539,7 +539,10 @@ server <- function(input, output, session){
       bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.8)
       matchmatrices <- vector(mode = 'list', length = length(bestmatches))
       names(matchmatrices) <- names(rvalues$xcmslist)
-      matchmatrix <- t(data.table::rbindlist(bestmatches[[1]]))
+      for (i in seq_along(bestmatches)) {
+        matchmatrices[[i]] <- t(data.table::rbindlist(bestmatches[[i]]))
+        colnames(matchmatrices[[i]]) <- names(bestmatches[[i]])
+      }
       output$foundcompoundstable <- renderDT({
         datatable(matchmatrix, class = 'cell-border stripe')
       })
@@ -651,7 +654,7 @@ server <- function(input, output, session){
   
   # Run automatic parameter detection and update page with new values. NOT DONE
   observeEvent(input$paramdetectrun, {
-    if(!is.null(rvalues$dir_or_file)) {
+    if(!is.null(rvalues$dir_or_file) | is.null(rvalues$data_input)) {
       showModal(modalDialog(
         title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
         'Please upload data first.',
