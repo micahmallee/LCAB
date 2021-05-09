@@ -135,7 +135,6 @@ smSet_msamples <- PerformPeakFiling(smSet_msamples, param = updateRawSpectraPara
 xcmslist <-  split_mSet(mSet = smSet_msamples)
 xcmslist <- annotate_xcmslist(xcmslist = xcmslist, perfwhm = 0.6)
 msplist <- lapply(xcmslist, to.msp, file = NULL, settings = NULL, ndigit = 3, minfeat = 10, minintens = 0, intensity = "maxo", secs2mins = F)
-
 querySPLASH1 <- get_splashscores(msp_list = msplist)
 full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
 full_mona_SPLASHES <- sapply(mona_msp, function(x){

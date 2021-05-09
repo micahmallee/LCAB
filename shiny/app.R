@@ -270,7 +270,7 @@ server <- function(input, output, session){
           }
         })
       })
-      names(indexes_per_sample) <- c(seq_along(indexes_per_sample))
+      names(indexes_per_sample) <- c(sprintf("Pseudospectra_%d", seq.int(indexes_per_sample)))
       indexes_per_sample <- Filter(Negate(function(x) is.null(unlist(x))), indexes_per_sample)
     })
     return(totalmatches)
@@ -537,6 +537,8 @@ server <- function(input, output, session){
       SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
       similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = mSet_msp, database = mona_msp)
       bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.8)
+      matchmatrices <- vector(mode = 'list', length = length(bestmatches))
+      names(matchmatrices) <- names(rvalues$xcmslist)
       matchmatrix <- t(data.table::rbindlist(bestmatches[[1]]))
       output$foundcompoundstable <- renderDT({
         datatable(matchmatrix, class = 'cell-border stripe')
