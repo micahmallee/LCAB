@@ -22,11 +22,6 @@ options(shiny.maxRequestSize=100*4096^2)
 # Preload MoNA_DB and SPLASH hashes
 mona_msp <- readRDS(file = 'data/mona_msp')
 mona_splashes <- readRDS(file = 'data/mona_splashes')
-# msplist <- readRDS('data/msplist')
-# xcmslist <- readRDS('data/xcmslist')
-# smsetje <- readRDS('data/smsetje')
-# p <- readRDS('data/p')
-# plotData <- readRDS('data/plotData')
 
 # Define UI.
 # The front end of the webapp is created here.
@@ -78,7 +73,7 @@ ui <- dashboardPage(
                       "input.directory_flag == 1",
                       shinyDirButton(id = "indir", label = "Choose directory", title = "Choose a directory")
                     ),
-                    
+                    shiny::
                     verbatimTextOutput('filepaths'),
                     
                     radioButtons(inputId = 'inspect_trim', label = 'Inspect or upload data.',
@@ -413,12 +408,6 @@ server <- function(input, output, session){
   # Create a reactive value object
   rvalues <- reactiveValues()
   
-  # rvalues$xcmslist <- xcmslist
-  # rvalues$msplist <- msplist
-  # rvalues$smsetje <- smsetje
-  # 
-  # output$foundpeaks <- renderPlotly(p)
-  
   volumes <- c(Home = fs::path_home(), "R Installation" = R.home(), getVolumes()())
   
   shinyFileChoose(
@@ -668,18 +657,21 @@ server <- function(input, output, session){
       ))
       return()
     }
-    memory_raw_data <- ImportRawMSData(foldername = rvalues$data_input, mode = 'inMemory', ncores = detectCores(), plotSettings = SetPlotParam(Plot = F))
-    param_initial <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
-                                snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter, mzdiff = input$mz_diff)
-    rvalues$optimized_params <- PerformParamsOptimization(raw_data = memory_raw_data, param = param_initial, ncore = detectCores())
-    updateNumericInput(session = session, inputId = 'ppm', label = 'ppm', value = rvalues$optimized_params$best_parameters$ppm , min = 0)
-    updateNumericInput(session = session, inputId = 'noise', label = 'Noise', value = rvalues$optimized_params$best_parameters$noise, min = 0)
-    updateNumericInput(session = session, inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = rvalues$optimized_params$best_parameters$min_peakwidth, min = 0)
-    updateNumericInput(session = session, inputId = 'mz_diff', label = 'mz diff', value = rvalues$optimized_params$best_parameters$mzdiff, min = -0.01)
-    updateNumericInput(session = session, inputId = 'max_peakwidth', label = 'Maximum peakwidth', value = rvalues$optimized_params$best_parameters$max_peakwidth, min = 0)
-    updateNumericInput(session = session, inputId = 'snthresh', label = 'Signal to noise threshold', value = rvalues$optimized_params$best_parameters$snthresh, min = 0)
-    updateNumericInput(session = session, inputId = 'prefilter', label = 'Prefilter', value = rvalues$optimized_params$best_parameters$prefilter, min = 0)
-    updateNumericInput(session = session, inputId = 'v_prefilter', label = 'Value of prefilter', value = rvalues$optimized_params$best_parameters$value_of_prefilter, min = 0)
+    withProgress({
+      memory_raw_data <- ImportRawMSData(foldername = rvalues$data_input, mode = 'inMemory', ncores = detectCores(), plotSettings = SetPlotParam(Plot = F))
+      param_initial <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = 'loess', ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
+                                    snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter, mzdiff = input$mz_diff)
+      rvalues$optimized_params <- PerformParamsOptimization(raw_data = memory_raw_data, param = param_initial, ncore = detectCores())
+      updateNumericInput(session = session, inputId = 'ppm', label = 'ppm', value = rvalues$optimized_params$best_parameters$ppm , min = 0)
+      updateNumericInput(session = session, inputId = 'noise', label = 'Noise', value = rvalues$optimized_params$best_parameters$noise, min = 0)
+      updateNumericInput(session = session, inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = rvalues$optimized_params$best_parameters$min_peakwidth, min = 0)
+      updateNumericInput(session = session, inputId = 'mz_diff', label = 'mz diff', value = rvalues$optimized_params$best_parameters$mzdiff, min = -0.01)
+      updateNumericInput(session = session, inputId = 'max_peakwidth', label = 'Maximum peakwidth', value = rvalues$optimized_params$best_parameters$max_peakwidth, min = 0)
+      updateNumericInput(session = session, inputId = 'snthresh', label = 'Signal to noise threshold', value = rvalues$optimized_params$best_parameters$snthresh, min = 0)
+      updateNumericInput(session = session, inputId = 'prefilter', label = 'Prefilter', value = rvalues$optimized_params$best_parameters$prefilter, min = 0)
+      updateNumericInput(session = session, inputId = 'v_prefilter', label = 'Value of prefilter', value = rvalues$optimized_params$best_parameters$value_of_prefilter, min = 0)
+      saveRDS(rvalues$optimized_params, 'optimized_params_rhino')
+    })
   })
   
   # Allow upload and saving of current parameters for future use

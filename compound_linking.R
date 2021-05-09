@@ -15,7 +15,7 @@ rhino <- readMSData(files = list.files('rhino_data/params/', full.names = T), mo
 rhino_trimmed <- PerformDataTrimming( datapath = 'rhino_data/params', plot = SetPlotParam(Plot = F), write = T, rt.idx = 1)
 raw <- ImportRawMSData(foldername = 'rhino_data/params', mode = 'inMemory', plotSettings = SetPlotParam(Plot = F))
 
-
+# Plot all peaks per sample
 p <- plot_chrom_tic_bpc(smSet_msamples$onDiskData, tic_visibility = 'legendonly')
 for (i in seq_along(xcmslist)) {
   p <- p %>% add_trace(data = data.frame(xcmslist[[i]]@groupInfo), 
@@ -23,10 +23,23 @@ for (i in seq_along(xcmslist)) {
                        name = paste(xcmslist[[i]]@xcmsSet@phenoData$sample_name))
 }
 
+# Plot all pseudospectra per sample
+plotData_single_sample <- plotdata_pseudospectra(list(test_data_msp))
+plotData_single_sample1 <- data.table::rbindlist(plotData, use.names = T)
 
-# two column matrix mz maxo
+plotData_msamples <- plotdata_pseudospectra(msplist)
+plotData_msamples1 <- data.table::rbindlist(plotData_msamples, use.names = T)
 
-plotiedata <- plotdata_pseudospectra(list(test_data_msp))
+p <- plot_chrom_tic_bpc(smSet_msamples$onDiskData, tic_visibility = 'legendonly')
+p <- plotdata_pseudospectra_traces(plotData_msamples, xcmslist = xcmslist, p)
+
+plotdata_pseudospectra_traces <- function(plotData, xcmslist, p){
+  for (i in seq_along(plotData)) {
+    p <- p %>% add_trace(data = plotData[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~pspectra_id, name = ~paste0('Pseudospectra: ', xcmslist[[i]]@xcmsSet@phenoData$sample_name))
+  }
+  return(p)
+}
+
 
 plotdata_pseudospectra <- function(msps){
   plotData <- vector(mode = 'list', length = length(msps))
@@ -42,13 +55,11 @@ plotdata_pseudospectra <- function(msps){
   return(plotData)
 }
 
-for (i in seq_along(plotData)) {
-  p <- p %>% add_trace(data = plotData[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~pspectra_id, name = ~paste0('Pseudospectra: ', xcmslist[[i]]@xcmsSet@phenoData$sample_name))
-}
 
 
 
-plotData1 <- data.table::rbindlist(plotData, use.names = T)
+
+
 
 
 
@@ -124,6 +135,7 @@ smSet_msamples <- PerformPeakFiling(smSet_msamples, param = updateRawSpectraPara
 xcmslist <-  split_mSet(mSet = smSet_msamples)
 xcmslist <- annotate_xcmslist(xcmslist = xcmslist, perfwhm = 0.6)
 msplist <- lapply(xcmslist, to.msp, file = NULL, settings = NULL, ndigit = 3, minfeat = 10, minintens = 0, intensity = "maxo", secs2mins = F)
+
 querySPLASH1 <- get_splashscores(msp_list = msplist)
 full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
 full_mona_SPLASHES <- sapply(mona_msp, function(x){
@@ -133,11 +145,16 @@ query_thirdblocks1 <- lapply(querySPLASH1, get_blocks, blocknr = 3)
 database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
 SPLASH_matches1 <- lapply(query_thirdblocks1, match_nines, database_blocks = database_thirdblocks)
 similarity_scores1 <- similarities_thirdblocks(nine_matches = SPLASH_matches1, msp_query = msplist, database = mona_msp)
+for(i in seq_along(similarity_scores1)) {names(similarity_scores1[[i]]) <- sprintf("Pseudospectra_%d", seq.int(similarity_scores1[[i]]))}
 bestmatches1 <- tophits(similarity_scores = similarity_scores1, limit = 5, database = mona_msp, splashmatches = SPLASH_matches1, score_cutoff = 0.8)
+matchmatrices <- vector(mode = 'list', length = length(bestmatches1))
+names(matchmatrices) <- names(xcmslist)
 for (i in seq_along(bestmatches1)) {
   nam <- paste0('matchmatrix',i)
-   assign(nam, t(data.table::rbindlist(bestmatches1[[i]])))
+  matchmatrices[[i]] <- t(data.table::rbindlist(bestmatches1[[i]]))
+  colnames(matchmatrices[[i]]) <- names(bestmatches1[[i]])
 }
+
 
 
 ## Compare multiple sample approach to single sample approach
@@ -151,10 +168,10 @@ blablaxsannotate <- groupFWHM(blablaxsannotate, perfwhm = 0.6)
 blablamsp <- to.msp(object = blablaxsannotate, file = NULL, settings = NULL, ndigit = 3, minfeat = 5, minintens = 0, intensity = "maxo", secs2mins = F)
 
 
-for (i in 1:length(bestmatches)) {
+for (i in 1:length(bestmatches1)) {
   try(expr = {
-    if (bestmatches[[i]][[1]][["Score"]] > 80) {
-      print(paste0(names(bestmatches)[i], '  Best match: ', bestmatches[[i]][[1]][[1]][["Name"]], ' Score: ', bestmatches[[i]][[1]][["Score"]]))
+    if (bestmatches1[[i]][[1]][["Score"]] > 0.1) {
+      print(paste0(names(bestmatches1)[i], '  Best match: ', bestmatches1[[i]][[1]][[1]][["Name"]], ' Score: ', bestmatches1[[i]][[1]][["Score"]]))
     }
   }, silent = T)
 }
@@ -280,7 +297,7 @@ tophits <- function(similarity_scores, limit = 5, database, splashmatches, score
         }
       })
     })
-    names(indexes_per_sample) <- c(seq_along(indexes_per_sample))
+    names(indexes_per_sample) <- c(sprintf("Pseudospectra_%d", seq.int(indexes_per_sample)))
     indexes_per_sample <- Filter(Negate(function(x) is.null(unlist(x))), indexes_per_sample)
   })
   return(totalmatches)
