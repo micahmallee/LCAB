@@ -33,6 +33,18 @@ plotData_msamples1 <- data.table::rbindlist(plotData_msamples, use.names = T)
 p <- plot_chrom_tic_bpc(smSet_msamples$onDiskData, tic_visibility = 'legendonly')
 p <- plotdata_pseudospectra_traces(plotData_msamples, xcmslist = xcmslist, p)
 
+# Plot all found compounds
+plotData_compounds <- get_compound_plotData(bestmatches = bestmatches1, plotData = plotData_msamples)
+p <- plot_chrom_tic_bpc(smSet_msamples$onDiskData, tic_visibility = 'legendonly')
+p <- plotdata_compounds_traces(plotData = plotData_compounds, p = p, msplist = msplist)
+
+plotdata_compounds_traces <- function(plotData, p, msplist) {
+  for (i in seq_along(plotData)) {
+    p <- p %>% add_trace(data = plotData[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~Compound, name = ~paste0("Compounds: ", names(msplist)[i]))
+  }
+  return(p)
+}
+
 plotdata_pseudospectra_traces <- function(plotData, xcmslist, p){
   for (i in seq_along(plotData)) {
     p <- p %>% add_trace(data = plotData[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~pspectra_id, name = ~paste0('Pseudospectra: ', xcmslist[[i]]@xcmsSet@phenoData$sample_name))
@@ -56,12 +68,19 @@ plotdata_pseudospectra <- function(msps){
 }
 
 
-
-
-
-
-
-
+get_compound_plotData <- function(bestmatches, plotData) {
+  compound_plotData <- vector('list', length = length(bestmatches))
+  compound_plotData <- lapply(seq_along(bestmatches), function(x) {
+    compound_plotData_per_sample <- plotData[[x]][as.integer(pspectra_nr),]
+    pspectra_nr <- str_extract(string = names(bestmatches[[x]]), "[0-9]")
+    top_compounds_per_sample <- vector(mode = 'character', length = length(bestmatches[[x]]))
+    top_compounds_per_sample <- sapply(seq_along(bestmatches[[x]]), function(y) {
+      bestmatches[[x]][[y]][[1]][1]
+    })
+    compound_plotData_per_sample <- cbind(compound_plotData_per_sample, Compound = top_compounds_per_sample)
+    compound_plotData_per_sample
+  })
+}
 
 # Preload MoNA_DB and SPLASH hashes
 mona_msp <- readRDS(file = 'shiny/data/mona_msp')
@@ -282,6 +301,7 @@ plot_chrom_tic_bpc <- function(raw_data, tic_visibility = NULL) {
   
   
 tophits <- function(similarity_scores, limit = 5, database, splashmatches, score_cutoff = 0.8) {
+  
   totalmatches <- vector('list', length(similarity_scores))
   totalmatches <- lapply(seq_along(similarity_scores), function(z){
     indexes_per_sample <- vector(mode = 'list', length = length(similarity_scores[[z]]))
