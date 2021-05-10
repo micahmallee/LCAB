@@ -144,14 +144,15 @@ query_thirdblocks1 <- lapply(querySPLASH1, get_blocks, blocknr = 3)
 database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
 SPLASH_matches1 <- lapply(query_thirdblocks1, match_nines, database_blocks = database_thirdblocks)
 similarity_scores1 <- similarities_thirdblocks(nine_matches = SPLASH_matches1, msp_query = msplist, database = mona_msp)
-for(i in seq_along(similarity_scores1)) {names(similarity_scores1[[i]]) <- sprintf("Pseudospectra_%d", seq.int(similarity_scores1[[i]]))}
+for(i in seq_along(similarity_scores1)) {names(similarity_scores1[[i]]) <- sprintf("Pseudospectrum_%d", seq.int(similarity_scores1[[i]]))}
 bestmatches1 <- tophits(similarity_scores = similarity_scores1, limit = 5, database = mona_msp, splashmatches = SPLASH_matches1, score_cutoff = 0.8)
 matchmatrices <- vector(mode = 'list', length = length(bestmatches1))
 names(matchmatrices) <- names(xcmslist)
+naampjes <- list()
 for (i in seq_along(bestmatches1)) {
-  nam <- paste0('matchmatrix',i)
   matchmatrices[[i]] <- t(data.table::rbindlist(bestmatches1[[i]]))
-  colnames(matchmatrices[[i]]) <- names(bestmatches1[[i]])
+  colnames(matchmatrices[[i]]) <- sort(rep(names(bestmatches1[[i]]), times = 2))
+  naampjes[[i]] <- names(bestmatches1[[i]])
 }
 
 
@@ -290,7 +291,7 @@ tophits <- function(similarity_scores, limit = 5, database, splashmatches, score
       top5_matches <- lapply(top5_scores, function(y){
         index1 <- grep(pattern = y, x = unlist(similarity_scores[[z]][[x]]))
         if (!is.na(splashmatches[[z]][[x]][index1]) & as.numeric(y) > score_cutoff) {
-          paste0('Compound: ', as.character(database[[splashmatches[[z]][[x]][index1[1]]]]["Name"]), '   Score: ', round((y * 100), 2))
+          c(as.character(database[[splashmatches[[z]][[x]][index1[1]]]]["Name"]), round((y * 100), 2))
         } else {
           NULL
         }

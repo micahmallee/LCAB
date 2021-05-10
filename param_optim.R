@@ -6,7 +6,7 @@ library(OptiLCMS)
 
 # Sys.setenv('R_REMOTES_NO_ERRORS_FROM_WARNINGS' = 'true')
 
-raw_data_trimmed <- OptiLCMS::PerformROIExtraction(datapath = 'rhino_data/params/', plot = F, rmConts = F)
+raw_data_trimmed <- OptiLCMS::PerformROIExtraction(datapath = 'rhino_mzxml/Regular/', plot = F, rmConts = F)
 param_initial <- OptiLCMS::SetPeakParam(platform = 'general', Peak_method = 'centWave', snthresh = 10, max_peakwidth = 16, min_peakwidth = 1)
 param_optimized <- OptiLCMS::PerformParamsOptimization(mSet = raw_data_trimmed, param = param_initial, ncore = 4)
 saveRDS(param_optimized, 'optimized_params')

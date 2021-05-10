@@ -26,6 +26,13 @@ mona_splashes <- readRDS(file = 'data/mona_splashes')
 # Define UI.
 # The front end of the webapp is created here.
 ui <- dashboardPage(
+  # tags$body(
+  #   tags$style(HTML("
+  #   body {
+  #   color: white;
+  #   }
+  #                   "))
+  # ),
   skin = 'midnight',
   header = dashboardHeader(
     title = tagList(
@@ -45,6 +52,18 @@ ui <- dashboardPage(
   ),
   # Main content
   body = dashboardBody(
+    tags$head(
+      tags$style(HTML("
+      .datatable_zooi {
+      overflow-x: auto;
+      overflow-y: auto;
+      font-size: 12px;
+      }
+      thead {
+      background-color: #F9F9F9;
+      }
+                      "))
+    ),
     useShinyjs(),
     tabItems(
       tabItem('dashboard', 
@@ -73,26 +92,18 @@ ui <- dashboardPage(
                       "input.directory_flag == 1",
                       shinyDirButton(id = "indir", label = "Choose directory", title = "Choose a directory")
                     ),
-                    shiny::
                     verbatimTextOutput('filepaths'),
-                    
                     radioButtons(inputId = 'inspect_trim', label = 'Inspect or upload data.',
                                  choices = list('Inspect' = 1,
                                                 'Upload' = 2),
                                  selected = 2, inline = T),
                     actionButton(inputId = 'run', label = 'Run')
-                    
                   )),
                 column(width = 9,
                        box(
                          width = 12,
                          plotlyOutput(outputId = 'inspect_plot')
                        )
-                       # box(
-                       #   width = 12,
-                       #   title = 'File information:',
-                       #   tableOutput(outputId = 'file') 
-                       # )
                        ))),
       tabItem('peakpicking',
               fluidRow(
@@ -175,11 +186,6 @@ ui <- dashboardPage(
                          tabPanel(title = 'Found peaks',
                                   textOutput(outputId = 'peakamount'),
                                   plotlyOutput(outputId = 'foundpeaks'))
-                         # shinyjs::hidden(div(id = 'createdpspectra',
-                         #                     tabPanel(
-                         #   title = 'Created pseudospectra',
-                         #   plotlyOutput(outputId = 'foundpseudospectra')
-                         # )))
                          ),
                   shinyjs::hidden(div(id = 'selectedbox',
                                       box(
@@ -189,16 +195,8 @@ ui <- dashboardPage(
                                           shinyjs::hidden(verbatimTextOutput(outputId = 'vsp')),
                                           shinyjs::hidden(plotOutput(outputId = 'mzspectrum'))
                   ))),
-                  box(
-                    id = 'compoundbox',
-                    collapsible = T,
-                    collapsed = T, closable = T,
-                    width = 12,
-                    title = 'Found compounds ',
-                    style = "height:500px; overflow-y: scroll; overflow-x:scroll;font-size:11px;background-color: white;",
-                    class = 'cell-border stripe',
-                    DTOutput(outputId = 'foundcompoundstable') %>% withSpinner()
-                  ))
+                  uiOutput(outputId = 'compoundbox')
+                  )
                 ))
     )
   ),
@@ -516,39 +514,65 @@ server <- function(input, output, session){
     }
   })
   
+  create_container <- function(sample_names) {
+    containerlist <- vector(mode = 'list', length = length(sample_names))
+    containerlist <- lapply(seq_along(sample_names), function(x) {
+      container_dt = withTags(table(
+        class = 'datatable_zooi', 
+        thead(
+          tr(
+            lapply(c(sample_names[[x]]), th, class = 'dt-center', colspan = 2, style = 'border-right: solid 1px; border-left: solid 1px;')),
+          tr(lapply((c(rep(c('Compound', 'Score'), length(sample_names[[x]])))), th))
+          )))
+    })
+    return(containerlist)
+  }
+
+  
   
   observeEvent(input$peakannotationrun, {
-    if (is.null(rvalues$xcmsSet) & is.null(rvalues$xcmslist)) {
-      showModal(modalDialog(
-        title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
-        'Please run peak detection first.',
-        easyClose = T
-      ))
-      return()
-    }
+    # if (is.null(rvalues$xcmsSet) & is.null(rvalues$xcmslist)) {
+    #   showModal(modalDialog(
+    #     title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
+    #     'Please run peak detection first.',
+    #     easyClose = T
+    #   ))
+    #   return()
+    # }
     withProgress(message = 'Running peak annotation', {
-      updateBox('compoundbox', action = 'toggle')
-      full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
-      full_mona_SPLASHES <- sapply(mona_msp, function(x){
-        str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
+      readRDS('data/matchmatrices')
+      # full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
+      # full_mona_SPLASHES <- sapply(mona_msp, function(x){
+      #   str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
+      # })
+      # query_thirdblocks <- lapply(querySPLASH, get_blocks, blocknr = 3)
+      # database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
+      # SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
+      # similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = mSet_msp, database = mona_msp)
+      # for(i in seq_along(similarity_scores)) {names(similarity_scores[[i]]) <- sprintf("Pseudospectrum_%d", seq.int(similarity_scores[[i]]))}
+      # bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.8)
+      # matchmatrices <- vector(mode = 'list', length = length(bestmatches))
+      # names(matchmatrices) <- names(xcmslist)
+      # sample_names <- vector(mode = 'list', length(bestmatches))
+      # for (i in seq_along(bestmatches)) {
+      #   matchmatrices[[i]] <- t(data.table::rbindlist(bestmatches[[i]]))
+      #   colnames(matchmatrices[[i]]) <- sort(rep(names(bestmatches[[i]]), times = 2))
+      #   sample_names[[i]] <- names(bestmatches[[i]])
+      # }
+      sample_names <- readRDS('data/naampjes')
+      containerlist <- create_container(sample_names)
+      output$compoundbox <- renderUI({
+        ntabs <- length(matchmatrices)
+        myTabs <- lapply(1:ntabs, function(x){
+          tabPanel(paste0(names(matchmatrices[x])), renderDT(matchmatrices[[x]], class = 'cell-border stripe', rownames = F, 
+                                                             filter = list(position = 'top', clear = F), 
+                                                             container = containerlist[[x]]), class = "datatable_zooi")
+        })
+        do.call(what = shinydashboard::tabBox, args = c(myTabs, list(id = 'compoundbox', width = 12)))
       })
-      query_thirdblocks <- lapply(querySPLASH, get_blocks, blocknr = 3)
-      database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
-      SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
-      similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = mSet_msp, database = mona_msp)
-      bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.8)
-      matchmatrices <- vector(mode = 'list', length = length(bestmatches))
-      names(matchmatrices) <- names(rvalues$xcmslist)
-      for (i in seq_along(bestmatches)) {
-        matchmatrices[[i]] <- t(data.table::rbindlist(bestmatches[[i]]))
-        colnames(matchmatrices[[i]]) <- names(bestmatches[[i]])
-      }
-      output$foundcompoundstable <- renderDT({
-        datatable(matchmatrix, class = 'cell-border stripe')
-      })
-      print(paste('Done with annotation'), length(bestmatches))
     })
   })
+  
   
   # Run peak detection
   observeEvent(input$peakdetectrun, {
@@ -605,7 +629,6 @@ server <- function(input, output, session){
   })
 
   rvalues$checked <- NULL
-  
   
   observeEvent(input$createpspectra, {
     if (length(input$data_input$datapath) == 1) {
