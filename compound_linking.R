@@ -124,8 +124,8 @@ system.time({
 
 p <- plot_chrom_tic_bpc(smSet_test_data$onDiskData, tic_visibility = 'legendonly')
 data1 <- data.frame(test_data_xcms@peaks)
-p <- p %>% add_trace(data = data1, 
-                     x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = rownames(data1), 
+p <- p %>% add_trace(data = data1,
+                     x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = rownames(data1),
                      name = paste(test_data_xcms@phenoData$sample_name))
 
 
