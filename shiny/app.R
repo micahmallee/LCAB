@@ -403,13 +403,14 @@ server <- function(input, output, session){
     return(xs)
   }
   
-  split_mSet <- function(mSet_object) {
+  split_mSet <- function(mSet) {
     #' This function splits the mSet object based on sample. 
-    f <- vector(mode = 'character', length = length(mSet_object[["xcmsSet"]]@phenoData[["sample_name"]]))
-    f <- sapply(mSet_object[["xcmsSet"]]@phenoData[["sample_name"]], function(x) {
+    f <- vector(mode = 'character', length = length(mSet$xcmsSet@phenoData$sample_name))
+    f <- sapply(mSet$xcmsSet@phenoData$sample_name, function(x) {
       gsub(x = x, pattern = " ", replacement =  ".", fixed = T)
     })
-    splitxcms <- xcms:::split.xcmsSet(mSet_object[["xcmsSet"]], f = factor(f))
+    splitxcms <- xcms:::split.xcmsSet(mSet$xcmsSet, f = factor(f))
+    for(i in seq_along(splitxcms)) {splitxcms[[i]]@peaks[, 11] <- i}
     return(splitxcms)
   }
   
@@ -612,7 +613,6 @@ server <- function(input, output, session){
   # Run peak detection
   observeEvent(input$peakdetectrun, {
     withProgress(message = 'Running peak detection', {
-      print(rvalues$dir_or_file)
       params <- SetPeakParam(platform = 'general', Peak_method = 'centWave', mzdiff = input$mz_diff, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
                              snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
       if(is.null(rvalues$raw_data)) {
@@ -624,38 +624,37 @@ server <- function(input, output, session){
         return()
       }
       if (is.null(rvalues$dir_or_file)){
-        print('Directory')
         mSet <- PerformPeakProfiling(rvalues$raw_data, params, plotSettings = SetPlotParam(Plot = F))
         xcmslist <-  split_mSet(mSet = mSet)
         rvalues$xcmslist <- xcmslist
-        p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly', source = 'p')
-        for (i in seq_along(xcmslist)) {
-          p <- p %>% add_trace(data = data.frame(xcmslist[[i]]@peaks), 
-                               x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
-                               name = paste(xcmslist[[i]]@phenoData[["sample_name"]]))
-        }
       } else if (!is.null(rvalues$dir_or_file) & rvalues$dir_or_file == 1) {
-        print('ja')
         mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
         xcmsSet <- mSet2xcmsSet(mSet)
         p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly', source = 'p')
-        p <- p %>% add_trace(data = data.frame(xcmsSet@peaks), 
-                             x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
-                             name = paste(xcmsSet@phenoData[["sample_name"]], ' total peaks'))
+        samplename <- list(xcmsSet@phenoData["sample_name"][[1]])
+        print(samplename)
+        plotData_peaks <- list(data.frame(xcmsSet@peaks))
         rvalues$xcmsSet <- xcmsSet
       } else if(!is.null(rvalues$dir_or_file) & rvalues$dir_or_file > 1) {
-        print('ja2')
         mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
         mSet <- PerformPeakAlignment(mSet, param = updateRawSpectraParam(params))
         mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(params))
         xcmslist <-  split_mSet(mSet = mSet)
         rvalues$xcmslist <- xcmslist
+      }
+      if (!is.null(rvalues$xcmslist)) {
         p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly', source = 'p')
-        for (i in seq_along(xcmslist)) {
-          p <- p %>% add_trace(data = data.frame(xcmslist[[i]]@peaks), 
-                               x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
-                               name = paste(xcmslist[[i]]@phenoData[["sample_name"]]))
+        plotData_peaks <- list(data.frame(xcmslist[[1]]@peaks))
+        for (i in 2:length(xcmslist)) {
+          plotData_peaks[[i]] <- data.frame(xcmslist[[i]]@peaks)
         }
+        samplename <- sapply(xcmslist, function(x) x@phenoData[["sample_name"]])
+      }
+      rvalues$plotData_peaks <- plotData_peaks
+      for (i in seq_along(plotData_peaks)) {
+        p <- p %>% add_trace(data = plotData_peaks[[i]], 
+                             x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
+                             name = paste(samplename[i], ' total peaks'))
       }
       rvalues$mSet <- mSet
       output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
@@ -667,29 +666,29 @@ server <- function(input, output, session){
   observeEvent(event_data(event = "plotly_click", priority = "event", source = 'p'), {
     shinyjs::show(id = 'selectedbox', anim = T)
     d <- event_data(event = "plotly_click", priority = "event", source = 'p')
+    plotData_peaks1 <- data.table::rbindlist(rvalues$plotData_peaks, use.names = T)
     if (is.null(d)) {
       return(NULL)
     } else {
+      plotData_peaks1 %>% filter(rt %in% d$x) -> peakdata
       shinyjs::show(id = 'vsp', anim = T, animType = 'fade')
       shinyjs::hide(id = 'mzspectrum', anim = T, animType = 'slide')
-      output$vsp <- renderPrint(rvalues$xcmsSet@peaks[rvalues$xcmsSet@peaks[, 'rt'] == d$x,, drop = F])
+      output$vsp <- renderPrint(peakdata)
     }
   })
 
   rvalues$checked <- NULL
   
   observeEvent(input$createpspectra, {
-    if (is.null(rvalues$dir_or_file)){
-      
+    if (is.null(rvalues$dir_or_file) | rvalues$dir_or_file > 1){
+      xcmslist <-  annotate_xcmslist(xcmslist = rvalues$xcmslist, perfwhm = input$perfwhm)
+      mSet_msp <- lapply(xcmslist, to.msp, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
     } else if (!is.null(rvalues$dir_or_file) & rvalues$dir_or_file == 1) {
       mSet_xsannotate <- xsAnnotate(rvalues$xcmsSet)
       mSet_xsannotate <- groupFWHM(mSet_xsannotate, perfwhm = input$perfwhm)
       mSet_msp <- to.msp(object = mSet_xsannotate, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
       mSet_msp <- list(mSet_msp)
       names(mSet_msp) <- rvalues$xcmsSet@phenoData$sample_name
-    } else if(!is.null(rvalues$dir_or_file) & rvalues$dir_or_file > 1) {
-      xcmslist <-  annotate_xcmslist(xcmslist = rvalues$xcmslist, perfwhm = input$perfwhm)
-      mSet_msp <- lapply(xcmslist, to.msp, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
     }
     if (is.null(rvalues$checked)) {
       appendTab(inputId = 'plottabbox', tab = tabPanel(title = 'Created pseudospectra', plotlyOutput('foundpseudospectra')), select = T)
@@ -704,15 +703,6 @@ server <- function(input, output, session){
     }
     output$foundpseudospectra <- renderPlotly(p1)
   })
-  
-  
-  # observe({
-  #   rvalues$p2 <- readRDS('data/p')
-  #   rvalues$plotData_compounds <- readRDS('data/plotData_compounds')
-  #   rvalues$bestmatches_pspectra <- readRDS('data/bestmatches_pspectra')
-  #   rvalues$mSet_msp <- readRDS('data/mSet_msp')
-  #   plotData_compounds1 <- data.table::rbindlist(rvalues$plotData_compounds, use.names = T)
-  # })
 
   
   # When a compound is clicked on, this piece of code shows the aligned spectra

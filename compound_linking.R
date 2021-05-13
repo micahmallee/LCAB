@@ -154,16 +154,6 @@ system.time({
   }
 })
 
-p <- plot_chrom_tic_bpc(smSet_test_data$onDiskData, tic_visibility = 'legendonly')
-data1 <- data.frame(test_data_xcms@peaks)
-p <- p %>% add_trace(data = data1,
-                     x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = rownames(data1),
-                     name = paste(test_data_xcms@phenoData$sample_name))
-
-
-pkinfo <- test_data_xcms@peaks[test_data_xcms@peaks[, 'rt'] == 71.2188,, drop = F]
-p1 <- test_data %>% filterRt(rt = c(pkinfo[, 4], pkinfo[, 4] + 0.0001)) %>% filterMz(mz = c(pkinfo[, 2], pkinfo[, 3])) %>% spectra
-
 
 
 ## Multiple samples
@@ -198,26 +188,13 @@ for (i in seq_along(bestmatches1)) {
   naampjes[[i]] <- names(bestmatches1[[i]])
 }
 
-
-
-## Compare multiple sample approach to single sample approach
-blabla <- readMSData('kruiden/Kruid 126 Zwarte peper 1 191119me_66.mzXML', mode = 'onDisk')
-blabla1 <- PerformPeakPicking(blabla, param = updateRawSpectraParam(params2))
-blabla1[["onDiskData"]]@phenoData@data[["sample_name"]] <- blabla1[["onDiskData"]]@phenoData@data[["sampleNames"]]
-blabla1[["onDiskData"]]@phenoData@data[["sampleNames"]] <- NULL
-blablaxcms <- mSet2xcmsSet(blabla1)
-blablaxsannotate <- xsAnnotate(blablaxcms)
-blablaxsannotate <- groupFWHM(blablaxsannotate, perfwhm = 0.6)
-blablamsp <- to.msp(object = blablaxsannotate, file = NULL, settings = NULL, ndigit = 3, minfeat = 5, minintens = 0, intensity = "maxo", secs2mins = F)
-
-
-for (i in 1:length(bestmatches1)) {
-  try(expr = {
-    if (bestmatches1[[i]][[1]][["Score"]] > 0.1) {
-      print(paste0(names(bestmatches1)[i], '  Best match: ', bestmatches1[[i]][[1]][[1]][["Name"]], ' Score: ', bestmatches1[[i]][[1]][["Score"]]))
-    }
-  }, silent = T)
+plotData_peaks <- data.frame(xcmslist[[1]]@groupInfo)
+for (i in 2:length(xcmslist)) {
+  plotData_peaks <- rbind(plotData_peaks, data.frame(xcmslist[[i]]@groupInfo))
 }
+
+plotData_peaks %>% filter(sample == 2) -> ja
+
 
 {
 #' Spiked data:
@@ -458,8 +435,10 @@ split_mSet <- function(mSet) {
     gsub(x = x, pattern = " ", replacement =  ".", fixed = T)
   })
   splitxcms <- xcms:::split.xcmsSet(mSet$xcmsSet, f = factor(f))
+  for(i in seq_along(splitxcms)) {splitxcms[[i]]@peaks[, 11] <- i}
   return(splitxcms)
 }
+
 
 annotate_xcmslist <- function(xcmslist, perfwhm = 0.6){
   #' This function groups the peaks into pseudospectra per sample.
