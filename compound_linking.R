@@ -38,6 +38,11 @@ plotData_compounds <- get_compound_plotData(bestmatches = bestmatches1, plotData
 p <- plot_chrom_tic_bpc(smSet_msamples$onDiskData, tic_visibility = 'legendonly')
 p <- plotdata_compounds_traces(plotData = plotData_compounds, p = p, msplist = msplist)
 
+# single sample
+plotData_compounds <- get_compound_plotData(bestmatches = bestmatches, plotData = plotdata_pseudospectra(test_data_msp))
+p <- plot_chrom_tic_bpc(smSet_test_data$onDiskData, tic_visibility = 'legendonly', source = 'p2')
+p <- plotdata_compounds_traces(plotData = plotData_compounds, p = p, msplist = test_data_msp)
+
 plotdata_compounds_traces <- function(plotData, p, msplist) {
   for (i in seq_along(plotData)) {
     p <- p %>% add_trace(data = plotData[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~Compound, name = ~paste0("Compounds: ", names(msplist)[i]))
@@ -71,8 +76,8 @@ plotdata_pseudospectra <- function(msps){
 get_compound_plotData <- function(bestmatches, plotData) {
   compound_plotData <- vector('list', length = length(bestmatches))
   compound_plotData <- lapply(seq_along(bestmatches), function(x) {
-    compound_plotData_per_sample <- plotData[[x]][as.integer(pspectra_nr),]
     pspectra_nr <- str_extract(string = names(bestmatches[[x]]), "[0-9]")
+    compound_plotData_per_sample <- plotData[[x]][as.integer(pspectra_nr),]
     top_compounds_per_sample <- vector(mode = 'character', length = length(bestmatches[[x]]))
     top_compounds_per_sample <- sapply(seq_along(bestmatches[[x]]), function(y) {
       bestmatches[[x]][[y]][[1]][1]
@@ -81,6 +86,24 @@ get_compound_plotData <- function(bestmatches, plotData) {
     compound_plotData_per_sample
   })
 }
+
+
+plot_align_spectra <- function(topSpectrum, botSpectrum) {
+  top_spectrum <- data.frame(mz = spec.top[, 1], intensity = spec.top[, 2])
+  top_spectrum$normalized <- round((top_spectrum$intensity/max(top_spectrum$intensity)) * 100)
+  fig <- plot_ly() %>% add_bars(
+    y = -1*abs(top_spectrum$normalized),
+    x = top_spectrum$mz,
+    name = 'Pseudospectrum sample'
+  )
+  fig <- fig %>% add_bars(
+    x = spec.bottom[,1],
+    y = spec.bottom[,2],
+    name = 'Pseudospectrum database'
+  )
+  return(fig)
+}
+
 
 # Preload MoNA_DB and SPLASH hashes
 mona_msp <- readRDS(file = 'shiny/data/mona_msp')
@@ -119,7 +142,16 @@ system.time({
   
   ### Get x top matches
   bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.6)
-  matchmatrix <- t(data.table::rbindlist(bestmatches[[1]]))
+  matchmatrices <- vector(mode = 'list', length = length(bestmatches))
+  names(matchmatrices) <- test_data_xcms@phenoData[["sample_name"]]
+  naampjes <- list()
+  bestmatches_pspectra <- lapply(bestmatches, function(x) lapply(x, function(y) lapply(y, function(z) z[3])))
+  bestmatches <- lapply(bestmatches, function(x) lapply(x, function(y) lapply(y, function(z) z[-3])))
+  for (i in seq_along(bestmatches)) {
+    matchmatrices[[i]] <- t(data.table::rbindlist(bestmatches[[i]]))
+    colnames(matchmatrices[[i]]) <- sort(rep(names(bestmatches[[i]]), times = 2))
+    naampjes[[i]] <- names(bestmatches[[i]])
+  }
 })
 
 p <- plot_chrom_tic_bpc(smSet_test_data$onDiskData, tic_visibility = 'legendonly')
@@ -127,14 +159,6 @@ data1 <- data.frame(test_data_xcms@peaks)
 p <- p %>% add_trace(data = data1,
                      x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = rownames(data1),
                      name = paste(test_data_xcms@phenoData$sample_name))
-
-
-
-p
-
-
-
-
 
 
 pkinfo <- test_data_xcms@peaks[test_data_xcms@peaks[, 'rt'] == 71.2188,, drop = F]
@@ -271,7 +295,7 @@ oke <- c(rbind(test_data_msp[[14]][, 1], test_data_msp[[14]][, 2]))
 }
 
 {
-plot_chrom_tic_bpc <- function(raw_data, tic_visibility = NULL) {
+plot_chrom_tic_bpc <- function(raw_data, tic_visibility = NULL, source = NULL) {
   if (is.null(tic_visibility)) {
     hovermode <- "x"
   } else {
@@ -280,7 +304,7 @@ plot_chrom_tic_bpc <- function(raw_data, tic_visibility = NULL) {
   samplenames <- raw_data@phenoData@data[["sample_name"]]
   fdataPerSample <- split.data.frame(raw_data@featureData@data, raw_data@featureData@data$fileIdx)
   cols <- RColorBrewer::brewer.pal(n = length(fdataPerSample) * 2, 'Paired')
-  p <- plot_ly(source = "p")
+  p <- plot_ly(source = source)
   for (i in seq_along(fdataPerSample)) {
     colindex <- if(i%%2 == 0) c(-i+1, -i) else c(i, i+1)
     plotData <- data.frame(scantime = fdataPerSample[[i]]$retentionTime, tic = fdataPerSample[[i]]$totIonCurrent, bpc = fdataPerSample[[i]]$basePeakIntensity)
@@ -301,7 +325,6 @@ plot_chrom_tic_bpc <- function(raw_data, tic_visibility = NULL) {
   
   
 tophits <- function(similarity_scores, limit = 5, database, splashmatches, score_cutoff = 0.8) {
-  
   totalmatches <- vector('list', length(similarity_scores))
   totalmatches <- lapply(seq_along(similarity_scores), function(z){
     indexes_per_sample <- vector(mode = 'list', length = length(similarity_scores[[z]]))
@@ -311,13 +334,13 @@ tophits <- function(similarity_scores, limit = 5, database, splashmatches, score
       top5_matches <- lapply(top5_scores, function(y){
         index1 <- grep(pattern = y, x = unlist(similarity_scores[[z]][[x]]))
         if (!is.na(splashmatches[[z]][[x]][index1]) & as.numeric(y) > score_cutoff) {
-          c(as.character(database[[splashmatches[[z]][[x]][index1[1]]]]["Name"]), round((y * 100), 2))
+          c(as.character(database[[splashmatches[[z]][[x]][index1[1]]]]["Name"]), round((y * 100), 2), database[[splashmatches[[z]][[x]][index1[1]]]]["pspectrum"])
         } else {
           NULL
         }
       })
     })
-    names(indexes_per_sample) <- c(sprintf("Pseudospectra_%d", seq.int(indexes_per_sample)))
+    names(indexes_per_sample) <- c(sprintf("Pseudospectrum_%d", seq.int(indexes_per_sample)))
     indexes_per_sample <- Filter(Negate(function(x) is.null(unlist(x))), indexes_per_sample)
   })
   return(totalmatches)
@@ -327,9 +350,6 @@ tophits <- function(similarity_scores, limit = 5, database, splashmatches, score
 similarities_thirdblocks <- function(nine_matches, msp_query, database) {
   #' Calculate SpectrumSimilarity per SPLASH match
   # Loop through hits
-  if (length(nine_matches) == 1) {
-    msp_query <- list(msp_query)
-  }
   if (.Platform$OS.type == 'windows') {
     num_cores <- detectCores()
     cl <- makeCluster(num_cores)
