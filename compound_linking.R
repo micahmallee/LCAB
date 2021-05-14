@@ -58,7 +58,7 @@ plotdata_pseudospectra_traces <- function(plotData, xcmslist, p){
 }
 
 
-plotdata_pseudospectra <- function(msps){
+get_plotData_pseudospectra <- function(msps){
   plotData <- vector(mode = 'list', length = length(msps))
   for (i in seq_along(msps)){
     pseudospectrum <- lapply(seq_along(msps[[i]]), function(x){
@@ -73,7 +73,15 @@ plotdata_pseudospectra <- function(msps){
 }
 
 
-get_compound_plotData <- function(bestmatches, plotData) {
+oke <- vector(mode = 'list', length = length(xcmslist))
+for (i in seq_along(xcmslist)) {
+  oke[[i]] <- as.data.frame(xcmslist[[i]]@peaks)
+  }
+oke1 <- rbind(oke[[1]], oke[[2]])
+oke1$rt <- round(oke1$rt, 4)
+
+
+get_plotData_compounds <- function(bestmatches, plotData) {
   compound_plotData <- vector('list', length = length(bestmatches))
   compound_plotData <- lapply(seq_along(bestmatches), function(x) {
     pspectra_nr <- str_extract(string = names(bestmatches[[x]]), "[0-9]")
@@ -188,12 +196,34 @@ for (i in seq_along(bestmatches1)) {
   naampjes[[i]] <- names(bestmatches1[[i]])
 }
 
-plotData_peaks <- data.frame(xcmslist[[1]]@groupInfo)
+plotData_peaks <- list(xcmslist[[1]]@peaks)
 for (i in 2:length(xcmslist)) {
-  plotData_peaks <- rbind(plotData_peaks, data.frame(xcmslist[[i]]@groupInfo))
+  plotData_peaks[[i]] <- xcmslist[[i]]@peaks
 }
 
 plotData_peaks %>% filter(sample == 2) -> ja
+
+p <- plot_chrom_tic_bpc(smSet_msamples$onDiskData, tic_visibility = 'legendonly', source = 'p')
+plotData_peaks <- list(xcmslist[[1]]@peaks)
+for (i in 2:length(xcmslist)) {
+  plotData_peaks[[i]] <- xcmslist[[i]]@peaks
+}
+samplename <- sapply(xcmslist, function(x) x@phenoData[["sample_name"]])
+
+for (i in seq_along(plotData_peaks)) {
+  p <- p %>% add_trace(data = data.frame(plotData_peaks[[i]]), 
+                       x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
+                       name = paste(samplename[i], ' total peaks'))
+}
+
+
+
+
+
+
+
+
+
 
 
 {

@@ -632,7 +632,6 @@ server <- function(input, output, session){
         xcmsSet <- mSet2xcmsSet(mSet)
         p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly', source = 'p')
         samplename <- list(xcmsSet@phenoData["sample_name"][[1]])
-        print(samplename)
         plotData_peaks <- list(data.frame(xcmsSet@peaks))
         rvalues$xcmsSet <- xcmsSet
       } else if(!is.null(rvalues$dir_or_file) & rvalues$dir_or_file > 1) {
@@ -644,15 +643,16 @@ server <- function(input, output, session){
       }
       if (!is.null(rvalues$xcmslist)) {
         p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly', source = 'p')
-        plotData_peaks <- list(data.frame(xcmslist[[1]]@peaks))
+        plotData_peaks <- list(xcmslist[[1]]@peaks)
         for (i in 2:length(xcmslist)) {
-          plotData_peaks[[i]] <- data.frame(xcmslist[[i]]@peaks)
+          plotData_peaks[[i]] <- xcmslist[[i]]@peaks
         }
         samplename <- sapply(xcmslist, function(x) x@phenoData[["sample_name"]])
       }
+      plotData_peaks <- lapply(plotData_peaks, data.table::data.table)
       rvalues$plotData_peaks <- plotData_peaks
       for (i in seq_along(plotData_peaks)) {
-        p <- p %>% add_trace(data = plotData_peaks[[i]], 
+        p <- p %>% add_trace(data = data.frame(plotData_peaks[[i]]), 
                              x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz, 
                              name = paste(samplename[i], ' total peaks'))
       }
@@ -670,7 +670,7 @@ server <- function(input, output, session){
     if (is.null(d)) {
       return(NULL)
     } else {
-      plotData_peaks1 %>% filter(rt %in% d$x) -> peakdata
+      plotData_peaks1 %>% filter(round(rt, 4) %in% d$x) -> peakdata
       shinyjs::show(id = 'vsp', anim = T, animType = 'fade')
       shinyjs::hide(id = 'mzspectrum', anim = T, animType = 'slide')
       output$vsp <- renderPrint(peakdata)
