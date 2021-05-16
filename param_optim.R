@@ -1,15 +1,25 @@
 library(MetaboAnalystR)
-library(OptiLCMS)
+# library(OptiLCMS)
 
 # raw_data1 <- ImportRawMSData(foldername = 'rhino_data/params/', mode = 'inMemory', plotSettings = SetPlotParam(Plot = F))
+
+raw_data1 <- MetaboAnalystR::PerformDataTrimming(datapath = 'rhino_data/params/', plot = F, rt.idx = 1)
+param_init <- MetaboAnalystR::SetPeakParam()
+param_optim <- MetaboAnalystR::PerformParamsOptimization(raw_data = raw_data1, param = param_init, ncore = 1)
+
+
 # raw_data2 <- ImportRawMSData(foldername = 'rhino_data/mzxml/', mode = 'onDisk', plotSettings = SetPlotParam(Plot = F))
+
+
+
+
 
 # Sys.setenv('R_REMOTES_NO_ERRORS_FROM_WARNINGS' = 'true')
 
-raw_data_trimmed <- OptiLCMS::PerformROIExtraction(datapath = 'rhino_mzxml/Regular/', plot = F, rmConts = F)
-param_initial <- OptiLCMS::SetPeakParam(platform = 'general', Peak_method = 'centWave', snthresh = 10, max_peakwidth = 16, min_peakwidth = 1, ppm = 20)
-param_optimized <- OptiLCMS::PerformParamsOptimization(mSet = raw_data_trimmed, param = param_initial, ncore = 4)
-saveRDS(param_optimized, 'optimized_params')
+# raw_data_trimmed <- OptiLCMS::PerformROIExtraction(datapath = 'rhino_mzxml/Regular/', plot = F, rmConts = F)
+# param_initial <- OptiLCMS::SetPeakParam(platform = 'general', Peak_method = 'centWave', snthresh = 10, max_peakwidth = 16, min_peakwidth = 1, ppm = 20)
+# param_optimized <- OptiLCMS::PerformParamsOptimization(mSet = raw_data_trimmed, param = param_initial, ncore = 4)
+# saveRDS(param_optimized, 'optimized_params')
 # param_optimized <- PerformParamsOptimization(raw_data, param = param_initial, ncore = 1)
 # 
 

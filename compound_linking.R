@@ -43,74 +43,21 @@ plotData_compounds <- get_compound_plotData(bestmatches = bestmatches, plotData 
 p <- plot_chrom_tic_bpc(smSet_test_data$onDiskData, tic_visibility = 'legendonly', source = 'p2')
 p <- plotdata_compounds_traces(plotData = plotData_compounds, p = p, msplist = test_data_msp)
 
-plotdata_compounds_traces <- function(plotData, p, msplist) {
-  for (i in seq_along(plotData)) {
-    p <- p %>% add_trace(data = plotData[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~Compound, name = ~paste0("Compounds: ", names(msplist)[i]))
-  }
-  return(p)
+
+for (i in seq_along(plotData_compounds)) {
+  p <- p %>% add_trace(data = plotData_compounds[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~Compound, name = ~paste0("Compounds: ", names(msplist)[i]))
+  p <- p %>% add_annotations(data = plotData_compounds[[i]], x = ~rt, y = ~intense, text = ~Compound, showlegend = F, showarrow = F)
 }
+p
 
-plotdata_pseudospectra_traces <- function(plotData, xcmslist, p){
-  for (i in seq_along(plotData)) {
-    p <- p %>% add_trace(data = plotData[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~pspectra_id, name = ~paste0('Pseudospectra: ', xcmslist[[i]]@xcmsSet@phenoData$sample_name))
-  }
-  return(p)
-}
+p <- plot_alignment(raw_data = smSet_msamples, tic_visibility = NULL, source = 'p_alignment')
 
 
-get_plotData_pseudospectra <- function(msps){
-  plotData <- vector(mode = 'list', length = length(msps))
-  for (i in seq_along(msps)){
-    pseudospectrum <- lapply(seq_along(msps[[i]]), function(x){
-      rt <- round(median(msps[[i]][[x]][, 3]), 4)
-      intense <- max(msps[[i]][[x]][, 2])
-      list(rt = rt, intense = intense, pspectra_id = x, sample_nr = i)
-    })
-    plotData[[i]] <- pseudospectrum
-  }
-  plotData <- lapply(plotData, data.table::rbindlist, use.names = T)
-  return(plotData)
-}
 
 
-oke <- vector(mode = 'list', length = length(xcmslist))
-for (i in seq_along(xcmslist)) {
-  oke[[i]] <- as.data.frame(xcmslist[[i]]@peaks)
-  }
-oke1 <- rbind(oke[[1]], oke[[2]])
-oke1$rt <- round(oke1$rt, 4)
 
 
-get_plotData_compounds <- function(bestmatches, plotData) {
-  compound_plotData <- vector('list', length = length(bestmatches))
-  compound_plotData <- lapply(seq_along(bestmatches), function(x) {
-    pspectra_nr <- str_extract(string = names(bestmatches[[x]]), "[0-9]")
-    compound_plotData_per_sample <- plotData[[x]][as.integer(pspectra_nr),]
-    top_compounds_per_sample <- vector(mode = 'character', length = length(bestmatches[[x]]))
-    top_compounds_per_sample <- sapply(seq_along(bestmatches[[x]]), function(y) {
-      bestmatches[[x]][[y]][[1]][1]
-    })
-    compound_plotData_per_sample <- cbind(compound_plotData_per_sample, Compound = top_compounds_per_sample)
-    compound_plotData_per_sample
-  })
-}
 
-
-plot_align_spectra <- function(topSpectrum, botSpectrum) {
-  top_spectrum <- data.frame(mz = spec.top[, 1], intensity = spec.top[, 2])
-  top_spectrum$normalized <- round((top_spectrum$intensity/max(top_spectrum$intensity)) * 100)
-  fig <- plot_ly() %>% add_bars(
-    y = -1*abs(top_spectrum$normalized),
-    x = top_spectrum$mz,
-    name = 'Pseudospectrum sample'
-  )
-  fig <- fig %>% add_bars(
-    x = spec.bottom[,1],
-    y = spec.bottom[,2],
-    name = 'Pseudospectrum database'
-  )
-  return(fig)
-}
 
 
 # Preload MoNA_DB and SPLASH hashes
@@ -302,6 +249,99 @@ oke <- c(rbind(test_data_msp[[14]][, 1], test_data_msp[[14]][, 2]))
 }
 
 {
+  plot_alignment <- function(raw_data, tic_visibility = NULL, source = NULL) {
+    if (is.null(tic_visibility)) {
+      hovermode <- "x"
+    } else {
+      hovermode <- "closest"
+    }
+    samplenames <- raw_data[["onDiskData"]]@phenoData@data[["sample_name"]]
+    fdataPerSample <- split.data.frame(raw_data[["onDiskData"]]@featureData@data, raw_data[["onDiskData"]]@featureData@data$fileIdx)
+    RTPerSample <- split(raw_data[["xcmsSet"]]@rt[["raw"]], raw_data[["onDiskData"]]@featureData@data$fileIdx)
+    CorrectedRT <- raw_data[["xcmsSet"]]@rt[["corrected"]]
+    cols <- RColorBrewer::brewer.pal(n = length(fdataPerSample) * 2, 'Paired')
+    p <- plot_ly(source = source)
+    for (i in seq_along(fdataPerSample)) {
+      colindex <- if(i%%2 == 0) c(-i+1, -i) else c(i, i+1)
+      plotData <- data.frame(scantime = fdataPerSample[[i]]$retentionTime, tic = fdataPerSample[[i]]$totIonCurrent, bpc = fdataPerSample[[i]]$basePeakIntensity)
+      p <- p %>% 
+        add_trace(data = plotData, x = ~RTPerSample[[i]], y = ~bpc, type = "scatter", mode = "lines", line = list(color = cols[colindex[1]], width = 0.8), 
+                  text = ~paste(scantime, "s"), visible = tic_visibility, name = paste("<b> Raw RT </b> ", samplenames[i]), legendgroup = 'Raw') %>% 
+        add_trace(data = plotData, x = ~CorrectedRT[[i]], y = ~bpc, type = "scatter", mode = "lines", line = list(color = cols[colindex[1]], width = 0.8), 
+                  text = ~paste(scantime, "s"), visible = tic_visibility, name = paste("<b> Corrected RT </b> ", samplenames[i]), legendgroup = 'Corrected')
+    }
+    p <- p %>% 
+      layout(legend = list(x = 0.7, y = 0.99), 
+             xaxis = list(title = "Scan time (s)", range = c(0, max(plotData$scantime)), showspikes = TRUE, spikemode = "toaxis+across", spikesnap = "data", 
+                          showline = FALSE, zeroline = FALSE, spikedash = "solid", showgrid = TRUE), 
+             yaxis = list(title = "Counts", showgrid = FALSE, showticklabels = TRUE, zeroline = FALSE, showline = FALSE), hovermode = "closest", showlegend = TRUE) %>% 
+      event_register("plotly_click")
+    return(p)
+  }
+  
+  
+  plotdata_compounds_traces <- function(plotData, p, msplist) {
+    for (i in seq_along(plotData)) {
+      p <- p %>% add_trace(data = plotData[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~Compound, name = ~paste0("Compounds: ", names(msplist)[i]))
+    }
+    return(p)
+  }
+  
+  plotdata_pseudospectra_traces <- function(plotData, xcmslist, p){
+    for (i in seq_along(plotData)) {
+      p <- p %>% add_trace(data = plotData[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~pspectra_id, name = ~paste0('Pseudospectra: ', xcmslist[[i]]@xcmsSet@phenoData$sample_name))
+    }
+    return(p)
+  }
+  
+  
+  get_plotData_pseudospectra <- function(msps){
+    plotData <- vector(mode = 'list', length = length(msps))
+    for (i in seq_along(msps)){
+      pseudospectrum <- lapply(seq_along(msps[[i]]), function(x){
+        rt <- round(median(msps[[i]][[x]][, 3]), 4)
+        intense <- max(msps[[i]][[x]][, 2])
+        list(rt = rt, intense = intense, pspectra_id = x, sample_nr = i)
+      })
+      plotData[[i]] <- pseudospectrum
+    }
+    plotData <- lapply(plotData, data.table::rbindlist, use.names = T)
+    return(plotData)
+  }
+  
+  
+  
+  get_plotData_compounds <- function(bestmatches, plotData) {
+    compound_plotData <- vector('list', length = length(bestmatches))
+    compound_plotData <- lapply(seq_along(bestmatches), function(x) {
+      pspectra_nr <- str_extract(string = names(bestmatches[[x]]), "[0-9]")
+      compound_plotData_per_sample <- plotData[[x]][as.integer(pspectra_nr),]
+      top_compounds_per_sample <- vector(mode = 'character', length = length(bestmatches[[x]]))
+      top_compounds_per_sample <- sapply(seq_along(bestmatches[[x]]), function(y) {
+        bestmatches[[x]][[y]][[1]][1]
+      })
+      compound_plotData_per_sample <- cbind(compound_plotData_per_sample, Compound = top_compounds_per_sample)
+      compound_plotData_per_sample
+    })
+  }
+  
+  
+  plot_align_spectra <- function(topSpectrum, botSpectrum) {
+    top_spectrum <- data.frame(mz = spec.top[, 1], intensity = spec.top[, 2])
+    top_spectrum$normalized <- round((top_spectrum$intensity/max(top_spectrum$intensity)) * 100)
+    fig <- plot_ly() %>% add_bars(
+      y = -1*abs(top_spectrum$normalized),
+      x = top_spectrum$mz,
+      name = 'Pseudospectrum sample'
+    )
+    fig <- fig %>% add_bars(
+      x = spec.bottom[,1],
+      y = spec.bottom[,2],
+      name = 'Pseudospectrum database'
+    )
+    return(fig)
+  }
+  
 plot_chrom_tic_bpc <- function(raw_data, tic_visibility = NULL, source = NULL) {
   if (is.null(tic_visibility)) {
     hovermode <- "x"
