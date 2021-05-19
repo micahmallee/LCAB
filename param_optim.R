@@ -11,23 +11,67 @@ param_optim <- MetaboAnalystR::PerformParamsOptimization(raw_data = raw_data1, p
 # raw_data2 <- ImportRawMSData(foldername = 'rhino_data/mzxml/', mode = 'onDisk', plotSettings = SetPlotParam(Plot = F))
 
 
+spiked_data <- readMSData(files = c('rhino_data/mzxml/Spike/Mara_spike_alkanen.mzXML', 
+                                    'rhino_data/mzxml/Spike/Naima_spike_alkanen.mzXML', 
+                                    'rhino_data/mzxml/Spike/Vungu_spike_alkanen.mzXML'), mode = 'onDisk')
 
 
-
-# Sys.setenv('R_REMOTES_NO_ERRORS_FROM_WARNINGS' = 'true')
-
-# raw_data_trimmed <- OptiLCMS::PerformROIExtraction(datapath = 'rhino_mzxml/Regular/', plot = F, rmConts = F)
-# param_initial <- OptiLCMS::SetPeakParam(platform = 'general', Peak_method = 'centWave', snthresh = 10, max_peakwidth = 16, min_peakwidth = 1, ppm = 20)
-# param_optimized <- OptiLCMS::PerformParamsOptimization(mSet = raw_data_trimmed, param = param_initial, ncore = 4)
-# saveRDS(param_optimized, 'optimized_params')
-# param_optimized <- PerformParamsOptimization(raw_data, param = param_initial, ncore = 1)
-# 
-
-
-# test_data_trimmed <- OptiLCMS::PerformROIExtraction(datapath = 'test_data_mzxml/converted/', rmConts = F, rt.idx = 1)
-# test_data_inmem <- readMSData('test_data_mzxml/raw/spike18.mzXML', mode = 'inMemory', msLevel. = 1)
-# param_optimized <-OptiLCMS::PerformParamsOptimization(test_data_trimmed, param = OptiLCMS::SetPeakParam(noise = 10, min_peakwidth = 2, max_peakwidth = 10), ncore = 1)
-# 
-# oke_dan <- PerformPeakPicking(object = oke, param = SetPeakParam(Peak_method = 'centWave', snthresh = 10, min_peakwidth = 2, max_peakwidth = 10))
-# 
-# oke <- OptiLCMS::ImportRawMSData(path = c('test_data_mzxml/raw/spike18.mzXML'), mode = 'onDisk')
+system.time({
+  ## Annotation steps 1 sample
+  ### Load data
+  spiked_data <- readMSData(files = c('rhino_data/mzxml/Spike/Mara_spike_alkanen.mzXML', 
+                                      'rhino_data/mzxml/Spike/Naima_spike_alkanen.mzXML', 
+                                      'rhino_data/mzxml/Spike/Vungu_spike_alkanen.mzXML'), mode = 'onDisk')
+  spiked_data@phenoData@data[["sample_name"]] <- spiked_data@phenoData@data[["sampleNames"]]
+  spiked_data@phenoData@data[["sampleNames"]] <- NULL
+  ### Peak detection
+  first_eval <- Noise_evaluate(spiked_data)
+  ## Define the rt and m/z range of the peak area
+  rtr <- c(1840, 1880)
+  mzr <- c(334.9, 335.1)
+  ## extract the chromatogram
+  chr_raw <- chromatogram(spiked_data, mz = mzr, rt = rtr)
+  plot(chr_raw)
+  
+  spiked_data %>%
+    filterRt(rt = rtr) %>%
+    filterMz(mz = c(72.8, 73.4)) %>%
+    plot(type = "XIC")
+  # ppm = 70
+  # peakwidth = 1,10
+  # 
+  
+  params <- SetPeakParam(ppm = first_eval$ppm, noise = first_eval$noise, value_of_prefilter = first_eval$value_of_prefilter,
+                         prefilter = first_eval$prefilter, min_peakwidth = 1, max_peakwidth = 5)
+  mSet_spiked_data <- PerformPeakPicking(spiked_data, param = updateRawSpectraParam(params))
+  spiked_data_xcms <- mSet2xcmsSet(mSet_spiked_data)
+  
+  ### Get pseudospectra and convert to msp format
+  spiked_data_xsannotate <- xsAnnotate(spiked_data_xcms)
+  spiked_data_xsannotate <- groupFWHM(spiked_data_xsannotate, perfwhm = 0.6)
+  spiked_data_msp <- to.msp(object = spiked_data_xsannotate, file = NULL, settings = NULL, ndigit = 0, minfeat = 3, minintens = 0, intensity = "maxo", secs2mins = F)
+  
+  ### Get SPLASH hashes and match thirdblocks
+  querySPLASH <- get_splashscores(msp_list = list(spiked_data_msp))
+  full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
+  full_mona_SPLASHES <- sapply(mona_msp, function(x){
+    str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
+  })
+  query_thirdblocks <- lapply(querySPLASH, get_blocks, blocknr = 3)
+  database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
+  SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
+  similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = spiked_data_msp, database = mona_msp)
+  
+  ### Get x top matches
+  bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.6)
+  matchmatrices <- vector(mode = 'list', length = length(bestmatches))
+  names(matchmatrices) <- spiked_data_xcms@phenoData[["sample_name"]]
+  naampjes <- list()
+  bestmatches_pspectra <- lapply(bestmatches, function(x) lapply(x, function(y) lapply(y, function(z) z[3])))
+  bestmatches <- lapply(bestmatches, function(x) lapply(x, function(y) lapply(y, function(z) z[-3])))
+  for (i in seq_along(bestmatches)) {
+    matchmatrices[[i]] <- t(data.table::rbindlist(bestmatches[[i]]))
+    colnames(matchmatrices[[i]]) <- sort(rep(names(bestmatches[[i]]), times = 2))
+    naampjes[[i]] <- names(bestmatches[[i]])
+  }
+})

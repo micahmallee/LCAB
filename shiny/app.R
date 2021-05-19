@@ -163,8 +163,10 @@ ui <- dashboardPage(
                     collapsed = T,
                     numericInput(inputId = 'perfwhm', label = 'Full width half maximum', value = 0.6, min = 0, max = 1, step = 0.1),
                     numericInput(inputId = 'ndigit', label = 'ndigit', value = 3, min = 0, max = 100, step = 1),
-                    numericInput(inputId = 'minfeat', label = 'Minimal features per pseudospectrum', value = 5, min = 0, max = 100, step = 1),
-                    numericInput(inputId = 'minintens', label = 'Minimal intensity', value = 0, min = 0, max = 100000, step = 1)
+                    numericInput(inputId = 'minfeat', label = 'Minimal features per pseudospectrum', value = 5, min = 1, max = 100, step = 1),
+                    numericInput(inputId = 'minintens', label = 'Minimal intensity', value = 0, min = 0, max = 100000, step = 1),
+                    numericInput(inputId = 'score_cutoff', label = 'Score cut-off', value = 0.8, min = 0, max = 1, step = 0,1),
+                    numericInput(inputId = 'hitamount', label = 'Amount of hits shown', value = 5, min = 1, max = 150, step = 1)
                   ),
                   box(width = 12, collapsible = T, collapsed = T,
                       title = 'Upload or save parameters',
@@ -176,7 +178,7 @@ ui <- dashboardPage(
                   width = 8,
                   tabBox(id = 'plottabbox', 
                          width = 12,
-                         tabPanel(title = 'Found peaks',
+                         tabPanel(title = 'Detected peaks',
                                   textOutput(outputId = 'peakamount'),
                                   plotlyOutput(outputId = 'foundpeaks'))
                          ),
@@ -480,6 +482,7 @@ server <- function(input, output, session){
       rvalues$dir_or_file <- length(filelocation$datapath)
       rvalues$data_input$datapath
     } else if (!is.integer(input$indir)) {
+      rvalues$dir_or_file <- ''
       dirlocation <- parseDirPath(volumes, input$indir)
       rvalues$data_input <- dirlocation
       dirlocation
@@ -588,37 +591,36 @@ server <- function(input, output, session){
   
   
   observeEvent(input$peakannotationrun, {
-    # if (is.null(rvalues$mSet_msp)) {
-    #   showModal(modalDialog(
-    #     title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
-    #     'Please run peak detection and pseudospectra creation first.',
-    #     easyClose = T
-    #   ))
-    #   return()
-    # }
-    # withProgress(message = 'Running peak annotation', {
-    #   full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
-    #   full_mona_SPLASHES <- sapply(mona_msp, function(x){
-    #     str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
-    #   })
-    #   querySPLASH <- get_splashscores(msp_list = rvalues$mSet_msp)
-    #   query_thirdblocks <- lapply(querySPLASH, get_blocks, blocknr = 3)
-    #   database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
-    #   SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
-    #   similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = rvalues$mSet_msp, database = mona_msp)
-    #   for(i in seq_along(similarity_scores)) {names(similarity_scores[[i]]) <- sprintf("Pseudospectrum_%d", seq.int(similarity_scores[[i]]))}
-    #   bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.8)
-    #   bestmatches_pspectra <- lapply(bestmatches, function(x) lapply(x, function(y) lapply(y, function(z) z[3])))
-    #   rvalues$bestmatches_pspectra <- bestmatches_pspectra
-    #   bestmatches <- lapply(bestmatches, function(x) lapply(x, function(y) lapply(y, function(z) z[-3])))
-    #   matchmatrices <- vector(mode = 'list', length = length(bestmatches))
-      matchmatrices <- readRDS('data/matchmatrices')
-      bestmatches <- readRDS('data/bestmatches')
-      rvalues$mSet_msp <- readRDS('data/mSet_msp')
-      rvalues$bestmatches_pspectra <- readRDS('data/bestmatches_pspectra')
-      # names(matchmatrices) <- names(rvalues$mSet[["onDiskData"]]@phenoData@data[["sample_name"]])
+    if (is.null(rvalues$mSet_msp)) {
+      showModal(modalDialog(
+        title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
+        'Please run peak detection and pseudospectra creation first.',
+        easyClose = T
+      ))
+      return()
+    }
+    withProgress(message = 'Running peak annotation', {
+      full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
+      full_mona_SPLASHES <- sapply(mona_msp, function(x){
+        str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
+      })
+      querySPLASH <- get_splashscores(msp_list = rvalues$mSet_msp)
+      query_thirdblocks <- lapply(querySPLASH, get_blocks, blocknr = 3)
+      database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
+      SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
+      similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = rvalues$mSet_msp, database = mona_msp)
+      for(i in seq_along(similarity_scores)) {names(similarity_scores[[i]]) <- sprintf("Pseudospectrum_%d", seq.int(similarity_scores[[i]]))}
+      bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.8)
+      bestmatches_pspectra <- lapply(bestmatches, function(x) lapply(x, function(y) lapply(y, function(z) z[3])))
+      rvalues$bestmatches_pspectra <- bestmatches_pspectra
+      bestmatches <- lapply(bestmatches, function(x) lapply(x, function(y) lapply(y, function(z) z[-3])))
+      matchmatrices <- vector(mode = 'list', length = length(bestmatches))
+      # matchmatrices <- readRDS('data/matchmatrices')
+      # bestmatches <- readRDS('data/bestmatches')
+      # rvalues$mSet_msp <- readRDS('data/mSet_msp')
+      # rvalues$bestmatches_pspectra <- readRDS('data/bestmatches_pspectra')
+      names(matchmatrices) <- names(rvalues$mSet[["onDiskData"]]@phenoData@data[["sample_name"]])
       sample_names <- vector(mode = 'list', length(bestmatches))
-      
       for (i in seq_along(bestmatches)) {
         matchmatrices[[i]] <- t(data.table::rbindlist(bestmatches[[i]]))
         colnames(matchmatrices[[i]]) <- sort(rep(names(bestmatches[[i]]), times = 2))
@@ -634,25 +636,25 @@ server <- function(input, output, session){
           output[[paste0('table', i)]] <- renderDT(matchmatrices[[i]], class = 'cell-border stripe', 
                    options = list(paging = F, searching = F),
                    filter = list(position = 'top', clear = F), rownames = F,
-                   container = containerlist[[i]])
+                   container = containerlist[[i]], selection = 'none')
         }
         do.call(what = shinydashboard::tabBox, args = c(myTabs, list(id = 'compoundbox', width = 12)))
       })
       rvalues$matchmatrices <- matchmatrices
-      # plotData_compounds <- get_compound_plotData(bestmatches = bestmatches, plotData = rvalues$plotData)
+      plotData_compounds <- get_compound_plotData(bestmatches = bestmatches, plotData = rvalues$plotData)
       plotData_compounds <- readRDS('data/plotData_compounds')
-      p2 <- readRDS('data/p2')
+      # p2 <- readRDS('data/p2')
       rvalues$plotData_compounds <- plotData_compounds
-      # p2 <- plot_chrom_tic_bpc(rvalues$mSet$onDiskData, tic_visibility = 'legendonly', source = 'p2')
-      # for (i in seq_along(plotData_compounds)) {
-      #   p2 <- p2 %>% add_trace(data = plotData_compounds[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~Compound, name = ~paste0("Compounds: ", names(rvalues$mSet_msp)[i]))
-      # }
+      p2 <- plot_chrom_tic_bpc(rvalues$mSet$onDiskData, tic_visibility = 'legendonly', source = 'p2')
+      for (i in seq_along(plotData_compounds)) {
+        p2 <- p2 %>% add_trace(data = plotData_compounds[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~Compound, name = ~paste0("Compounds: ", names(rvalues$mSet_msp)[i]))
+      }
       if (is.null(rvalues$checked[[3]])) {
-        appendTab(inputId = 'plottabbox', tab = tabPanel(title = 'Found compounds', plotlyOutput('foundcompounds')), select = T)
+        appendTab(inputId = 'plottabbox', tab = tabPanel(title = 'Compounds detected', plotlyOutput('foundcompounds')), select = T)
       rvalues$checked[[3]] <- 3
       }
       output$foundcompounds <- renderPlotly(p2)
-    # })
+    })
   })
   
   
@@ -673,7 +675,7 @@ server <- function(input, output, session){
       pspectra <- as.integer(str_split(pspectra_id, '_')[[1]][2])
       output$alignedmzspectrum <- renderPlot(OrgMassSpecR::SpectrumSimilarity(spec.top = rvalues$mSet_msp[[input$compoundbox]][[pspectra]],
                                                                               spec.bottom = rvalues$bestmatches_pspectra[[rvalues$tableindex]][[pspectra_id]][[rank]]$pspectrum,
-                                                                              top.label = 'Found compound', bottom.label = 'Database compound',
+                                                                              top.label = 'Detected compound', bottom.label = 'Database compound',
                                                                               print.alignment = F))
     }
   })
@@ -806,11 +808,11 @@ server <- function(input, output, session){
     shinyjs::hide(id = 'mzspectrum')
     # OrgMassSpecR::SpectrumSimilarity(spec.top = rvalues$mSet_msp[[ja$sample_nr]][[ja$pspectra_id]], 
     #                                  spec.bottom = rvalues$bestmatches_pspectra[[1]][[ja$pspectra_id]][[1]]$pspectrum, 
-    #                                  top.label = 'Found compound', bottom.label = 'Database compound', 
+    #                                  top.label = 'Detected compound', bottom.label = 'Database compound', 
     #                                  print.alignment = F)
     output$alignedmzspectrum <- renderPlot(OrgMassSpecR::SpectrumSimilarity(spec.top = rvalues$mSet_msp[[ja$sample_nr]][[ja$pspectra_id]], 
                                                                             spec.bottom = rvalues$bestmatches_pspectra[[1]][[ja$pspectra_id]][[1]]$pspectrum, 
-                                                                            top.label = 'Found compound', bottom.label = 'Database compound', 
+                                                                            top.label = 'Detected compound', bottom.label = 'Database compound', 
                                                                             print.alignment = F))
     # output$alignedmzspectrum <- renderPlotly(fig)
   })

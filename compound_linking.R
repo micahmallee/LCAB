@@ -108,7 +108,7 @@ system.time({
     naampjes[[i]] <- names(bestmatches[[i]])
   }
 })
-
+# oke
 
 
 ## Multiple samples
