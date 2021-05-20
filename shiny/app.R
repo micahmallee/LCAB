@@ -39,8 +39,10 @@ ui <- dashboardPage(
     collapsed = F, 
     width = 330,
     sidebarMenu(collapsed = T,
-      menuItem('Dashboard', tabName = 'dashboard', icon = icon('dashboard')),
-      menuItem('Peak detection', tabName = 'peakpicking', icon = icon('search'))
+      menuItem('Dashboard', tabName = 'dashboard', icon = icon('home')),
+      menuItem('Data inspection', tabName = 'datainspection', icon = icon('search')),
+      menuItem('Peak detection', tabName = 'peakpicking', icon = icon('chart-bar')),
+      menuItem('Compare samples', tabName = 'comparesamples', icon = icon('balance-scale'))
     )
   ),
   # Main content
@@ -98,6 +100,24 @@ ui <- dashboardPage(
                          plotlyOutput(outputId = 'inspect_plot')
                        )
                        ))),
+      tabItem('datainspection',
+              fluidRow(
+                column(
+                  width = 4,
+                  box(id = 'inspection_param_box', width = 12, collapsible = T, style = 'font-size: 11px;',
+                      title = 'Select region to inspect',
+                      textOutput(outputId = 'mzrange'),
+                      textOutput(outputId = 'rtrange'),
+                      numericInput(inputId = 'min_mz', label = 'Starting value of m/z range', value = 72.9),
+                      numericInput(inputId = 'max_mz', label = 'Ending value of m/z range', value = 73.1),
+                      numericInput(inputId = 'min_rt', label = 'Starting value of rt range', value = 1840),
+                      numericInput(inputId = 'max_rt', label = 'Ending value of rt range', value = 1880),
+                      actionButton(inputId = 'runxicinspect', label = 'Show plot'))
+                ),
+                column(width = 8,
+                       box(id = 'xic_box', width = 12, title = 'XIC plot', 
+                           plotOutput(outputId = 'xic_plot')))
+              )),
       tabItem('peakpicking',
               fluidRow(
                 column(
@@ -197,7 +217,7 @@ ui <- dashboardPage(
     )
   ),
   footer = dashboardFooter(
-    left = 'MetabOracle 0.6',
+    left = 'MetabOracle 0.8',
     right = 'Made by Micah Mallée'
   )
 )
@@ -553,6 +573,30 @@ server <- function(input, output, session){
       output$inspect_plot <- renderPlotly(plot_chrom_tic_bpc(rvalues$raw_data, source = NULL))
     }
     })
+  
+  output$mzrange <- renderText({
+    req(rvalues$raw_data)
+    mzrange <- c(min(rvalues$raw_data@featureData@data[["lowMZ"]]), max(rvalues$raw_data@featureData@data[["highMZ"]]))
+    paste('MZ values range from: ', mzrange[1], ' to ', mzrange[2])
+  })
+  
+  output$rtrange <- renderText({
+    req(rvalues$raw_data)
+    rtrange <- c(min(rvalues$raw_data@featureData@data[["retentionTime"]]), max(rvalues$raw_data@featureData@data[["retentionTime"]]))
+    paste('Retention time ranges from: ', rtrange[1], ' to ', rtrange[2])
+  })
+  
+  
+  observeEvent(input$runxicinspect, {
+    req(input$min_mz, input$max_mz, input$min_rt, input$max_rt, rvalues$raw_data)
+    withProgress(message = 'Plotting...', {
+      spiked_data %>%
+        filterRt(rt = c(input$min_rt, input$max_rt)) %>%
+        filterMz(mz = as.numeric(c(input$min_mz, input$max_mz))) -> p_xic
+      output$xic_plot <- renderPlot(plot(p_xic, type = 'XIC'))
+    })
+  })
+  
   
   # Check amount of samples. If less than 2, do not show alignment parameters
   observe({

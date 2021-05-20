@@ -41,18 +41,17 @@ system.time({
   # peakwidth = 1,10
   # 
   
-  params <- SetPeakParam(ppm = first_eval$ppm, noise = first_eval$noise, value_of_prefilter = first_eval$value_of_prefilter,
-                         prefilter = first_eval$prefilter, min_peakwidth = 1, max_peakwidth = 5)
+  params <- SetPeakParam(ppm = 70, noise = 5000, value_of_prefilter = 5000,
+                         prefilter = 2, min_peakwidth = 1, max_peakwidth = 10)
   mSet_spiked_data <- PerformPeakPicking(spiked_data, param = updateRawSpectraParam(params))
-  spiked_data_xcms <- mSet2xcmsSet(mSet_spiked_data)
-  
-  ### Get pseudospectra and convert to msp format
-  spiked_data_xsannotate <- xsAnnotate(spiked_data_xcms)
-  spiked_data_xsannotate <- groupFWHM(spiked_data_xsannotate, perfwhm = 0.6)
-  spiked_data_msp <- to.msp(object = spiked_data_xsannotate, file = NULL, settings = NULL, ndigit = 0, minfeat = 3, minintens = 0, intensity = "maxo", secs2mins = F)
+  mSet_spiked_data <- PerformPeakAlignment(mSet_spiked_data, param = updateRawSpectraParam(params))
+  mSet_spiked_data <- PerformPeakFiling(mSet_spiked_data, param = updateRawSpectraParam(params))
+  spiked_data_xcmslist <-  split_mSet(mSet = mSet_spiked_data)
+  spiked_data_xcmslist <- annotate_xcmslist(xcmslist = spiked_data_xcmslist, perfwhm = 0.6)
+  spiked_data_msp <- lapply(spiked_data_xcmslist, to.msp, file = NULL, settings = NULL, ndigit = 3, minfeat = 10, minintens = 0, intensity = "maxo", secs2mins = F)
   
   ### Get SPLASH hashes and match thirdblocks
-  querySPLASH <- get_splashscores(msp_list = list(spiked_data_msp))
+  querySPLASH <- get_splashscores(msp_list = spiked_data_msp)
   full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
   full_mona_SPLASHES <- sapply(mona_msp, function(x){
     str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
