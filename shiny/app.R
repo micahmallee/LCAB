@@ -88,16 +88,12 @@ ui <- dashboardPage(
                       shinyDirButton(id = "indir", label = "Choose directory", title = "Choose a directory")
                     ),
                     verbatimTextOutput('filepaths'),
-                    radioButtons(inputId = 'inspect_trim', label = 'Inspect or upload data.',
-                                 choices = list('Inspect' = 1,
-                                                'Upload' = 2),
-                                 selected = 2, inline = T),
-                    actionButton(inputId = 'run', label = 'Run')
+                    actionButton(inputId = 'upload', label = 'Upload')
                   )),
                 column(width = 9,
                        box(
                          width = 12,
-                         plotlyOutput(outputId = 'inspect_plot')
+                         plotlyOutput(outputId = 'initial_plot')
                        )
                        ))),
       tabItem('datainspection',
@@ -112,54 +108,71 @@ ui <- dashboardPage(
                       numericInput(inputId = 'max_mz', label = 'Ending value of m/z range', value = 73.1),
                       numericInput(inputId = 'min_rt', label = 'Starting value of rt range', value = 1840),
                       numericInput(inputId = 'max_rt', label = 'Ending value of rt range', value = 1880),
-                      actionButton(inputId = 'runxicinspect', label = 'Show plot'))
+                      actionButton(inputId = 'runxicinspect', label = 'Show extracted ion plot'),
+                      actionButton(inputId = 'runinspect', label = 'Show 3D spectrum'))
                 ),
                 column(width = 8,
-                       box(id = 'xic_box', width = 12, title = 'XIC plot', 
-                           plotOutput(outputId = 'xic_plot')))
+                       box(id = 'xic_box', width = 12, title = 'Inspect figure', 
+                           plotOutput(outputId = 'inspect_plot',height = '700px')))
               )),
       tabItem('peakpicking',
               fluidRow(
                 column(
                   width = 4,
-                  box(id = 'picking_param_box', width = 6, collapsible = T, collapsed = F,
-                      style = "font-size:11px;",
-                      title = 'Input parameters for peak picking',
-                      numericInput(inputId = 'ppm', label = 'ppm', value = 25, min = 0),
-                      bsTooltip(id = 'ppm', title = 'Maximum tolerated fluctuation of m/z value (ppm) from scan to scan - depends on the mass spectrometer accuracy', placement = 'right', trigger = 'hover'),
-                      numericInput(inputId = 'noise', label = 'Noise', value = 10000, min = 0),
-                      bsTooltip(id = 'noise', title = 'Each centroid must be greater than the "noise" intensity value', placement = 'right', trigger = 'hover'),
-                      numericInput(inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = 1, min = 0),
-                      bsTooltip(id = 'min_peakwidth', title = 'Minimum peak width in seconds', placement = 'right', trigger = 'hover'),
-                      numericInput(inputId = 'mz_diff', label = 'mz diff', value = 0.05, min = -0.01),
-                      bsTooltip(id = 'mz_diff', title = 'Minimum difference in m/z for peaks with overlapping retention times, can be negative to allow overlap', placement = 'right', trigger = 'hover'),
-                      numericInput(inputId = 'max_peakwidth', label = 'Maximum peakwidth', value = 10, min = 0),
-                      bsTooltip(id = 'max_peakwidth', title = 'Maximum peak width in seconds', placement = 'right', trigger = 'hover'),
+                  box(id = 'picking_param_box', width = 6, collapsible = T, collapsed = F, title = 'Input parameters for peak picking', style = "font-size:11px;",
+                      selectInput(
+                        inputId = 'peakpicking_flag',
+                        label = 'centWave or matchedFilter algorithm?',choices = c(centWave = 'centWave', matchedFilter = 'matchedFilter')
+                      ),
+                      conditionalPanel(
+                        "input.peakpicking_flag == 'matchedFilter'",
+                        numericInput(inputId = 'fwhm', label = 'FWHM', value = 0.6, min = 0.1, max = 6),
+                        bsTooltip(id = 'fwhm', title = ' The full width at half maximum of matched filtration gaussian model peak', placement = 'right', trigger = 'hover'),
+                        numericInput(inputId = 'sigma', label = 'Sigma', value = 12.74, min = 0),
+                        bsTooltip(id = 'sigma', title = 'The standard deviation (width) of the matched filtration model peak', placement = 'right', trigger = 'hover'),
+                        numericInput(inputId = 'steps', label = 'Steps', value = 2, min = 0),
+                        bsTooltip(id = 'steps', title = 'The number of bins to be merged before filtration', placement = 'right', trigger = 'hover'),
+                        # numericInput(inputId = 'peakBinSize', label = 'Peak bin size', value = 0.05, min = -0.01),
+                        # bsTooltip(id = 'peakBinSize', title = 'Minimum difference in m/z for peaks with overlapping retention times, can be negative to allow overlap', placement = 'right', trigger = 'hover'),
+                        # numericInput(inputId = 'max', label = 'Maximum peakwidth', value = 10, min = 0),
+                        # bsTooltip(id = 'max', title = 'Maximum peak width in seconds', placement = 'right', trigger = 'hover')
+                      ),
+                      conditionalPanel(
+                        "input.peakpicking_flag == 'centWave'",
+                        numericInput(inputId = 'ppm', label = 'ppm', value = 25, min = 0),
+                        bsTooltip(id = 'ppm', title = 'Maximum tolerated fluctuation of m/z value (ppm) from scan to scan - depends on the mass spectrometer accuracy', placement = 'right', trigger = 'hover'),
+                        numericInput(inputId = 'noise', label = 'Noise', value = 10000, min = 0),
+                        bsTooltip(id = 'noise', title = 'Each centroid must be greater than the "noise" intensity value', placement = 'right', trigger = 'hover'),
+                        numericInput(inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = 1, min = 0),
+                        bsTooltip(id = 'min_peakwidth', title = 'Minimum peak width in seconds', placement = 'right', trigger = 'hover'),
+                        numericInput(inputId = 'mz_diff', label = 'mz diff', value = 0.05, min = -0.01),
+                        bsTooltip(id = 'mz_diff', title = 'Minimum difference in m/z for peaks with overlapping retention times, can be negative to allow overlap', placement = 'right', trigger = 'hover'),
+                        numericInput(inputId = 'max_peakwidth', label = 'Maximum peakwidth', value = 10, min = 0),
+                        bsTooltip(id = 'max_peakwidth', title = 'Maximum peak width in seconds', placement = 'right', trigger = 'hover'),
+                        numericInput(inputId = 'prefilter', label = 'Prefilter', value = 3, min = 0),
+                        bsTooltip(id = 'prefilter', title = 'A peak must be present in x scans with an intensity greater than the value of the prefilter', placement = 'right', trigger = 'hover'),
+                        numericInput(inputId = 'v_prefilter', label = 'Value of prefilter', value = 100, min = 0),
+                        bsTooltip(id = 'v_prefilter', title = 'Value of prefilter', placement = 'right', trigger = 'hover')
+                      ),
                       numericInput(inputId = 'snthresh', label = 'Signal to noise threshold', value = 100, min = 0),
                       bsTooltip(id = 'snthresh', title = 'Signal to noise ratio cut-off (intensity)', placement = 'right', trigger = 'hover'),
-                      numericInput(inputId = 'prefilter', label = 'Prefilter', value = 3, min = 0),
-                      bsTooltip(id = 'prefilter', title = 'A peak must be present in x scans with an intensity greater than the value of the prefilter', placement = 'right', trigger = 'hover'),
-                      numericInput(inputId = 'v_prefilter', label = 'Value of prefilter', value = 100, min = 0),
-                      bsTooltip(id = 'v_prefilter', title = 'Value of prefilter', placement = 'right', trigger = 'hover'),
                       actionButton(inputId = 'peakdetectrun', label = 'Perform peak detection', width = '100%', style = 'margin-bottom:8px;'),
                       actionButton(inputId = 'peakannotationrun', label = 'Perform peak annotation', width = '100%', style = 'margin-bottom:8px;'),
-                      actionButton(inputId = 'createpspectra', label = 'Create and show pseudospectra', width = '100%', style = 'margin-bottom:8px;'),
+                      actionButton(inputId = 'createpspectra', label = HTML('Create pseudospectra'), width = '100%', style = 'margin-bottom:8px;'),
                       actionButton(inputId = 'paramdetectrun', HTML("Automatic parameter <br/>optimization"), width = '100%')
                   ),
-                    box(id =  'align_param_box', width = 6, collapsible = T, collapsed = F, closable = T,
+                    box(id = 'align_param_box', width = 6, collapsible = T,
                         style = "font-size:11px;",
                         title = 'Input parameters for peak alignment',
                         selectInput(inputId = 'rtmethod', label = 'Method', choices = list('loess' = 'loess', 'obiwarp' = 'obiwarp'),selected = 'loess'),
-                        # loess
-                        div(id = 'loessparams',
-                            numericInput(inputId = 'extra', label = 'Extra', value = 1, min = 0),
-                            bsTooltip(id = 'extra', title = 'Number of "extra" peaks used to define reference peaks (or well-behaved peaks) for modeling time deviation. Number of Peaks > number of samples.', placement = 'left', trigger = 'hover'),
-                            numericInput(inputId = 'span', label = 'Span', value = 0.25, min = 0),
-                            bsTooltip(id = 'span', title = 'Degree of smoothing of the loess model. 0.2 to 1', placement = 'left', trigger = 'hover')),
-                        # obiwarp
-                        div(id = 'obiwarpparams',
-                            numericInput(inputId = 'prof_step', label = 'profStep', value = 100, min = 0),
-                            bsTooltip(id = 'prof_step', title = 'Prof step', placement = 'left', trigger = 'hover')),
+                        conditionalPanel(condition = "input.rtmethod == 'loess'",
+                                         numericInput(inputId = 'extra', label = 'Extra', value = 1, min = 0),
+                                         bsTooltip(id = 'extra', title = 'Number of "extra" peaks used to define reference peaks (or well-behaved peaks) for modeling time deviation. Number of Peaks > number of samples.', placement = 'left', trigger = 'hover'),
+                                         numericInput(inputId = 'span', label = 'Span', value = 0.25, min = 0),
+                                         bsTooltip(id = 'span', title = 'Degree of smoothing of the loess model. 0.2 to 1', placement = 'left', trigger = 'hover')),
+                        conditionalPanel(condition = "input.rtmethod == 'obiwarp'",
+                                         numericInput(inputId = 'prof_step', label = 'profStep', value = 100, min = 0),
+                                         bsTooltip(id = 'prof_step', title = 'Prof step', placement = 'left', trigger = 'hover')),
                         # Grouping:
                         numericInput(inputId = 'bw', label = 'Bandwith', value = 10, min = 1),
                         bsTooltip(id = 'bw', title = 'Standart deviation of the gaussian metapeak that groups peaks together.', placement = 'left', trigger = 'hover'), 
@@ -182,11 +195,10 @@ ui <- dashboardPage(
                     collapsible = T, 
                     collapsed = T,
                     numericInput(inputId = 'perfwhm', label = 'Full width half maximum', value = 0.6, min = 0, max = 1, step = 0.1),
-                    numericInput(inputId = 'ndigit', label = 'ndigit', value = 3, min = 0, max = 100, step = 1),
                     numericInput(inputId = 'minfeat', label = 'Minimal features per pseudospectrum', value = 5, min = 1, max = 100, step = 1),
-                    numericInput(inputId = 'minintens', label = 'Minimal intensity', value = 0, min = 0, max = 100000, step = 1),
-                    numericInput(inputId = 'score_cutoff', label = 'Score cut-off', value = 0.8, min = 0, max = 1, step = 0,1),
-                    numericInput(inputId = 'hitamount', label = 'Amount of hits shown', value = 5, min = 1, max = 150, step = 1)
+                    numericInput(inputId = 'minintens', label = 'Minimal intensity', value = 0.001, min = 0, max = 1, step = 0.01),
+                    numericInput(inputId = 'score_cutoff', label = 'Score cut-off', value = 0.6, min = 0, max = 1, step = 0.1, width = '100%'),
+                    numericInput(inputId = 'hitamount', label = 'Amount of hits shown', value = 20, min = 1, max = 150, step = 5)
                   ),
                   box(width = 12, collapsible = T, collapsed = T,
                       title = 'Upload or save parameters',
@@ -226,6 +238,20 @@ ui <- dashboardPage(
 server <- function(input, output, session){
   ### functions
   {
+  create_container <- function(sample_names) {
+    containerlist <- vector(mode = 'list', length = length(sample_names))
+    containerlist <- lapply(seq_along(sample_names), function(x) {
+      container_dt = withTags(table(
+        class = 'datatable_zooi', 
+        thead(
+          tr(
+            lapply(c(sample_names[[x]]), th, class = 'dt-center', colspan = 2, style = 'border-right: solid 1px; border-left: solid 1px;')),
+          tr(lapply((c(rep(c('Compound', 'Score'), length(sample_names[[x]])))), th))
+        )))
+    })
+    return(containerlist)
+  }
+    
   plot_alignment <- function(raw_data, tic_visibility = NULL, source = NULL) {
     if (is.null(tic_visibility)) {
       hovermode <- "x"
@@ -272,10 +298,10 @@ server <- function(input, output, session){
     return(fig)
   }  
     
-  get_compound_plotData <- function(bestmatches, plotData) {
+  get_plotData_compounds <- function(bestmatches, plotData) {
     compound_plotData <- vector('list', length = length(bestmatches))
     compound_plotData <- lapply(seq_along(bestmatches), function(x) {
-      pspectra_nr <- str_extract(string = names(bestmatches[[x]]), "[0-9]")
+      pspectra_nr <- as.integer(sub('.*Pseudospectrum_', '', names(bestmatches[[x]])))
       compound_plotData_per_sample <- plotData[[x]][as.integer(pspectra_nr),]
       top_compounds_per_sample <- vector(mode = 'character', length = length(bestmatches[[x]]))
       top_compounds_per_sample <- sapply(seq_along(bestmatches[[x]]), function(y) {
@@ -502,7 +528,7 @@ server <- function(input, output, session){
       rvalues$dir_or_file <- length(filelocation$datapath)
       rvalues$data_input$datapath
     } else if (!is.integer(input$indir)) {
-      rvalues$dir_or_file <- ''
+      # rvalues$dir_or_file <- ''
       dirlocation <- parseDirPath(volumes, input$indir)
       rvalues$data_input <- dirlocation
       dirlocation
@@ -550,29 +576,30 @@ server <- function(input, output, session){
   })
   
   
-  # Run button (upload vs inspect) check radiobutton, then run accordingly
-  observeEvent(input$run, {
+  observeEvent(input$upload, {
     req(rvalues$data_input)
     progress <- shiny::Progress$new()
     on.exit(progress$close())
     progress$set(message = "Creating plot", value = 10)
-    if(input$inspect_trim == 1){
-      output$inspect_plot <- renderPlot(PerformDataInspect(rvalues$data_input))
+    if(is.null(rvalues$dir_or_file)) {
+      rvalues$raw_data <- ImportRawMSData(foldername = rvalues$data_input, mode = 'onDisk', ncores = detectCores(), plotSettings = SetPlotParam(Plot = F))
+    } else {
+      sample_names <- c(rvalues$data_input$datapath)
+      sample_names <- gsub("^.*/", "", sample_names)
+      rvalues$raw_data <- readMSData(files = c(rvalues$data_input$datapath), mode = 'onDisk')
+      rvalues$raw_data@phenoData@data[["sample_name"]] <- sample_names
+      rvalues$raw_data@phenoData@data[["sampleNames"]] <- NULL
     }
-    else {
-      if(is.null(rvalues$dir_or_file)) {
-        rvalues$raw_data <- ImportRawMSData(foldername = rvalues$data_input, mode = 'onDisk', ncores = detectCores(), plotSettings = SetPlotParam(Plot = F))
-      } else {
-        sample_names <- c(rvalues$data_input$datapath)
-        sample_names <- gsub("^.*/", "", sample_names)
-        rvalues$raw_data <- readMSData(files = c(rvalues$data_input$datapath), mode = 'onDisk')
-        rvalues$raw_data@phenoData@data[["sampleNames"]] <- sample_names
-        rvalues$raw_data@phenoData@data[["sample_name"]] <- rvalues$raw_data@phenoData@data[["sampleNames"]]
-        rvalues$raw_data@phenoData@data[["sampleNames"]] <- NULL
-      }
-      output$inspect_plot <- renderPlotly(plot_chrom_tic_bpc(rvalues$raw_data, source = NULL))
-    }
+    output$initial_plot <- renderPlotly(plot_chrom_tic_bpc(rvalues$raw_data, source = NULL))
     })
+  
+  observeEvent(input$runinspect, {
+    req(rvalues$data_input)
+    progress <- shiny::Progress$new()
+    on.exit(progress$close())
+    progress$set(message = "Creating plot", value = 10)
+    output$inspect_plot <- renderPlot(PerformDataInspect(rvalues$data_input$datapath))
+  })
   
   output$mzrange <- renderText({
     req(rvalues$raw_data)
@@ -590,118 +617,15 @@ server <- function(input, output, session){
   observeEvent(input$runxicinspect, {
     req(input$min_mz, input$max_mz, input$min_rt, input$max_rt, rvalues$raw_data)
     withProgress(message = 'Plotting...', {
-      spiked_data %>%
+      rvalues$raw_data %>%
         filterRt(rt = c(input$min_rt, input$max_rt)) %>%
         filterMz(mz = as.numeric(c(input$min_mz, input$max_mz))) -> p_xic
-      output$xic_plot <- renderPlot(plot(p_xic, type = 'XIC'))
+      output$inspect_plot <- renderPlot(plot(p_xic, type = 'XIC'))
     })
   })
-  
-  
-  # Check amount of samples. If less than 2, do not show alignment parameters
-  observe({
-    if (is.null(rvalues$dir_or_file)) {
-      updateBox('align_param_box', action = 'restore')
-      updateBox('picking_param_box', action = 'update', options = list(
-        width = 6
-      ))
-    } else if (rvalues$dir_or_file > 1){
-      updateBox('align_param_box', action = 'restore')
-      updateBox('picking_param_box', action = 'update', options = list(
-        width = 6
-      ))
-    } else {
-      updateBox('align_param_box', action = 'remove')
-      updateBox('picking_param_box', action = 'update', options = list(
-        width = 12
-      ))
-    }
-  })
-  
-  create_container <- function(sample_names) {
-    containerlist <- vector(mode = 'list', length = length(sample_names))
-    containerlist <- lapply(seq_along(sample_names), function(x) {
-      container_dt = withTags(table(
-        class = 'datatable_zooi', 
-        thead(
-          tr(
-            lapply(c(sample_names[[x]]), th, class = 'dt-center', colspan = 2, style = 'border-right: solid 1px; border-left: solid 1px;')),
-          tr(lapply((c(rep(c('Compound', 'Score'), length(sample_names[[x]])))), th))
-          )))
-    })
-    return(containerlist)
-  }
 
-  
-  
-  observeEvent(input$peakannotationrun, {
-    if (is.null(rvalues$mSet_msp)) {
-      showModal(modalDialog(
-        title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
-        'Please run peak detection and pseudospectra creation first.',
-        easyClose = T
-      ))
-      return()
-    }
-    withProgress(message = 'Running peak annotation', {
-      full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
-      full_mona_SPLASHES <- sapply(mona_msp, function(x){
-        str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
-      })
-      querySPLASH <- get_splashscores(msp_list = rvalues$mSet_msp)
-      query_thirdblocks <- lapply(querySPLASH, get_blocks, blocknr = 3)
-      database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
-      SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
-      similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = rvalues$mSet_msp, database = mona_msp)
-      for(i in seq_along(similarity_scores)) {names(similarity_scores[[i]]) <- sprintf("Pseudospectrum_%d", seq.int(similarity_scores[[i]]))}
-      bestmatches <- tophits(similarity_scores = similarity_scores, limit = 5, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = 0.8)
-      bestmatches_pspectra <- lapply(bestmatches, function(x) lapply(x, function(y) lapply(y, function(z) z[3])))
-      rvalues$bestmatches_pspectra <- bestmatches_pspectra
-      bestmatches <- lapply(bestmatches, function(x) lapply(x, function(y) lapply(y, function(z) z[-3])))
-      matchmatrices <- vector(mode = 'list', length = length(bestmatches))
-      # matchmatrices <- readRDS('data/matchmatrices')
-      # bestmatches <- readRDS('data/bestmatches')
-      # rvalues$mSet_msp <- readRDS('data/mSet_msp')
-      # rvalues$bestmatches_pspectra <- readRDS('data/bestmatches_pspectra')
-      names(matchmatrices) <- names(rvalues$mSet[["onDiskData"]]@phenoData@data[["sample_name"]])
-      sample_names <- vector(mode = 'list', length(bestmatches))
-      for (i in seq_along(bestmatches)) {
-        matchmatrices[[i]] <- t(data.table::rbindlist(bestmatches[[i]]))
-        colnames(matchmatrices[[i]]) <- sort(rep(names(bestmatches[[i]]), times = 2))
-        sample_names[[i]] <- names(bestmatches[[i]])
-      }
-      containerlist <- create_container(sample_names)
-      output$compoundbox <- renderUI({
-        ntabs <- length(matchmatrices)
-        myTabs <- lapply(1:ntabs, function(x){
-          tabPanel(paste0(names(matchmatrices[x])), dataTableOutput(outputId = paste0('table', x)) , class = "datatable_zooi") 
-        })
-        for (i in 1:ntabs) {
-          output[[paste0('table', i)]] <- renderDT(matchmatrices[[i]], class = 'cell-border stripe', 
-                   options = list(paging = F, searching = F),
-                   filter = list(position = 'top', clear = F), rownames = F,
-                   container = containerlist[[i]], selection = 'none')
-        }
-        do.call(what = shinydashboard::tabBox, args = c(myTabs, list(id = 'compoundbox', width = 12)))
-      })
-      rvalues$matchmatrices <- matchmatrices
-      plotData_compounds <- get_compound_plotData(bestmatches = bestmatches, plotData = rvalues$plotData)
-      plotData_compounds <- readRDS('data/plotData_compounds')
-      # p2 <- readRDS('data/p2')
-      rvalues$plotData_compounds <- plotData_compounds
-      p2 <- plot_chrom_tic_bpc(rvalues$mSet$onDiskData, tic_visibility = 'legendonly', source = 'p2')
-      for (i in seq_along(plotData_compounds)) {
-        p2 <- p2 %>% add_trace(data = plotData_compounds[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~Compound, name = ~paste0("Compounds: ", names(rvalues$mSet_msp)[i]))
-      }
-      if (is.null(rvalues$checked[[3]])) {
-        appendTab(inputId = 'plottabbox', tab = tabPanel(title = 'Compounds detected', plotlyOutput('foundcompounds')), select = T)
-      rvalues$checked[[3]] <- 3
-      }
-      output$foundcompounds <- renderPlotly(p2)
-    })
-  })
-  
-  
+
+  # Observes
   observe({
     rvalues$tableindex <- match(input$compoundbox, names(rvalues$matchmatrices))
     rvalues$currenttable <- paste0('table', rvalues$tableindex, '_cell_clicked')
@@ -728,8 +652,13 @@ server <- function(input, output, session){
   # Run peak detection
   observeEvent(input$peakdetectrun, {
     withProgress(message = 'Running peak detection', {
-      params <- SetPeakParam(platform = 'general', Peak_method = 'centWave', mzdiff = input$mz_diff, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
-                             snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
+      if (input$peakpicking_flag == 'centWave') {
+        params <- SetPeakParam(platform = 'general', Peak_method = 'centWave', mzdiff = input$mz_diff, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
+                               snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
+      } else if (input$peakpicking_flag == 'matchedFilter') {
+        params <- SetPeakParam(platform = 'general', Peak_method = input$peakpicking_flag, mzdiff = input$mz_diff,
+                               snthresh = input$snthresh, fwhm = input$fwhm, sigma = input$sigma, steps = input$steps, peakBinSize = input$peakBinSize)
+      }
       if(is.null(rvalues$raw_data)) {
         showModal(modalDialog(
           title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
@@ -768,7 +697,6 @@ server <- function(input, output, session){
           appendTab(inputId = 'plottabbox', tab = tabPanel(title = 'Alignment results', plotlyOutput('alignmentresults')), select = T)
           rvalues$checked[[2]] <- 2
         }
-        saveRDS(mSet, 'mSet_aligned')
         p_aligned <- plot_alignment(raw_data = mSet, tic_visibility = NULL, source = 'p_aligned')
         output$alignmentresults <- renderPlotly(p_aligned)
       }
@@ -778,6 +706,7 @@ server <- function(input, output, session){
                              x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz,
                              name = paste(samplename[i], ' total peaks'))
       }
+      mSet$onDiskData@phenoData@data$sample_name <- rvalues$raw_data@phenoData@data[["sample_name"]]
       rvalues$mSet <- mSet
       output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
       output$foundpeaks <- renderPlotly(p)
@@ -807,16 +736,16 @@ server <- function(input, output, session){
   observeEvent(input$createpspectra, {
     if (is.null(rvalues$dir_or_file) | rvalues$dir_or_file > 1){
       xcmslist <-  annotate_xcmslist(xcmslist = rvalues$xcmslist, perfwhm = input$perfwhm)
-      mSet_msp <- lapply(xcmslist, to.msp, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
+      mSet_msp <- lapply(xcmslist, to.msp, file = NULL, settings = NULL, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
     } else if (!is.null(rvalues$dir_or_file) & rvalues$dir_or_file == 1) {
       mSet_xsannotate <- xsAnnotate(rvalues$xcmsSet)
       mSet_xsannotate <- groupFWHM(mSet_xsannotate, perfwhm = input$perfwhm)
-      mSet_msp <- to.msp(object = mSet_xsannotate, file = NULL, settings = NULL, ndigit = input$ndigit, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
+      mSet_msp <- to.msp(object = mSet_xsannotate, file = NULL, settings = NULL, minfeat = input$minfeat, minintens = input$minintens, intensity = "maxo", secs2mins = F)
       mSet_msp <- list(mSet_msp)
       names(mSet_msp) <- rvalues$xcmsSet@phenoData$sample_name
     }
     if (is.null(rvalues$checked[[1]])) {
-      appendTab(inputId = 'plottabbox', tab = tabPanel(title = 'Created pseudospectra', plotlyOutput('foundpseudospectra')), select = T)
+      appendTab(inputId = 'plottabbox', tab = tabPanel(title = 'Pseudospectra', textOutput(outputId = 'pspectra_amount'), plotlyOutput('foundpseudospectra')), select = T)
       rvalues$checked[[1]] <- 1
     } 
     rvalues$mSet_msp <- mSet_msp
@@ -824,8 +753,9 @@ server <- function(input, output, session){
     plotData <- plotdata_pseudospectra(msps = mSet_msp)
     rvalues$plotData <- plotData
     for (i in seq_along(plotData)) {
-      p1 <- p1 %>% add_trace(data = plotData[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~pspectra_id, name = ~paste0('Pseudospectra: ', names(mSet_msp)[i]))
+      p1 <- p1 %>% add_trace(data = plotData[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~pspectra_id, name = paste('Pseudospectra: ', names(mSet_msp)[i]))
     }
+    output$pspectra_amount <- renderPrint(lengths(mSet_msp))
     output$foundpseudospectra <- renderPlotly(p1)
   })
 
@@ -846,7 +776,6 @@ server <- function(input, output, session){
       return(NULL)
     }
     # fig <- plot_align_spectra(topSpectrum = rvalues$mSet_msp[[ja$sample_nr]][[1]], botSpectrum = rvalues$bestmatches_pspectra[[1]][[ja$pspectra_id]][[1]]$pspectrum)
-    
     shinyjs::show(id = 'alignedmzspectrum', anim = T, animType = 'fade', asis = T)
     shinyjs::hide(id = 'vsp')
     shinyjs::hide(id = 'mzspectrum')
@@ -882,6 +811,70 @@ server <- function(input, output, session){
     shinyjs::show(id = 'mzspectrum', anim = T, animType = 'fade', asis = T)
     shinyjs::hide(id = 'vsp')
     output$mzspectrum <- renderPlot(plotPseudoSpectrum(rvalues$mSet_msp[[ja$sample_nr]][[ja$pspectra_id]][, 1:2]))
+  })
+  
+  # Observes when the peak annotation button is clicked. Runs peak annotation and outputs plot
+  observeEvent(input$peakannotationrun, {
+    if (is.null(rvalues$mSet_msp)) {
+      showModal(modalDialog(
+        title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
+        'Please run peak detection and pseudospectra creation first.',
+        easyClose = T
+      ))
+      return()
+    }
+    withProgress(message = 'Running peak annotation', {
+      full_mona_SPLASHES <- vector(mode = 'character', length = length(mona_msp))
+      full_mona_SPLASHES <- sapply(mona_msp, function(x){
+        str_extract(string = x$Comments, pattern = regex('SPLASH=splash10................'))
+      })
+      querySPLASH <- get_splashscores(msp_list = rvalues$mSet_msp)
+      query_thirdblocks <- lapply(querySPLASH, get_blocks, blocknr = 3)
+      database_thirdblocks <- get_blocks(splashscores = full_mona_SPLASHES, blocknr = 3)
+      SPLASH_matches <- lapply(query_thirdblocks, match_nines, database_blocks = database_thirdblocks)
+      similarity_scores <- similarities_thirdblocks(nine_matches = SPLASH_matches, msp_query = rvalues$mSet_msp, database = mona_msp)
+      for(i in seq_along(similarity_scores)) {names(similarity_scores[[i]]) <- sprintf("Pseudospectrum_%d", seq.int(similarity_scores[[i]]))}
+      bestmatches <- tophits(similarity_scores = similarity_scores, limit = input$hitamount, database = mona_msp, splashmatches = SPLASH_matches, score_cutoff = input$score_cutoff)
+      names(bestmatches) <- names(rvalues$mSet[["onDiskData"]]@phenoData@data[["sample_name"]])
+      bestmatches_pspectra <- lapply(bestmatches, function(x) lapply(x, function(y) lapply(y, function(z) z[3])))
+      rvalues$bestmatches_pspectra <- bestmatches_pspectra
+      bestmatches <- lapply(bestmatches, function(x) lapply(x, function(y) lapply(y, function(z) z[-3])))
+      matchmatrices <- vector(mode = 'list', length = length(bestmatches))
+      names(matchmatrices) <- rvalues$mSet[["onDiskData"]]@phenoData@data[["sample_name"]]
+      sample_names <- vector(mode = 'list', length(bestmatches))
+      for (i in seq_along(bestmatches)) {
+        matchmatrices[[i]] <- t(data.table::rbindlist(bestmatches[[i]]))
+        colnames(matchmatrices[[i]]) <- sort(rep(names(bestmatches[[i]]), times = 2))
+        sample_names[[i]] <- names(bestmatches[[i]])
+      }
+      containerlist <- create_container(sample_names)
+      output$compoundbox <- renderUI({
+        ntabs <- length(matchmatrices)
+        myTabs <- lapply(seq_along(ntabs), function(x){
+          tabPanel(paste0(names(matchmatrices[x])), dataTableOutput(outputId = paste0('table', x)) , class = "datatable_zooi") 
+        })
+        do.call(what = shinydashboard::tabBox, args = c(myTabs, list(id = 'compoundbox', width = 12)))
+      })
+      for (i in seq_along(matchmatrices)) {
+        output[[paste0('table', i)]] <- renderDT(matchmatrices[[i]], class = 'cell-border stripe', extensions = 'Buttons',
+                                                 options = list(dom = 'Bfrtip', buttons = list('copy', 'print', list(extend = 'collection', buttons = c('csv', 'excel', 'pdf'), text = 'Download')),
+                                                                paging = F, searching = F),
+                                                 filter = list(position = 'top', clear = F), rownames = F,
+                                                 container = containerlist[[i]], selection = 'single')
+      }
+      rvalues$matchmatrices <- matchmatrices
+      plotData_compounds <- get_plotData_compounds(bestmatches = bestmatches, plotData = get_plotData_pseudospectra(rvalues$mSet_msp))
+      rvalues$plotData_compounds <- plotData_compounds
+      p2 <- plot_chrom_tic_bpc(rvalues$mSet$onDiskData, tic_visibility = 'legendonly', source = 'p2')
+      for (i in seq_along(plotData_compounds)) {
+        p2 <- p2 %>% add_trace(data = plotData_compounds[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~Compound, name = paste("Compounds: ", names(rvalues$mSet_msp)[i]))
+      }
+      if (is.null(rvalues$checked[[3]])) {
+        appendTab(inputId = 'plottabbox', tab = tabPanel(title = 'Compounds detected', plotlyOutput('foundcompounds')), select = T)
+        rvalues$checked[[3]] <- 3
+      }
+      output$foundcompounds <- renderPlotly(p2)
+    })
   })
   
   

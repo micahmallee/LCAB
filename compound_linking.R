@@ -7,6 +7,29 @@ library(stringr)
 # data(FEMsettings)
 # rm(Orbitrap.RP, Synapt.NP, Synapt.RP)
 
+mzs <- mz(spiked_data)
+
+bpis <- chromatogram(spiked_data, aggregationFun = "max")
+
+## Bin the BPC
+bpis_bin <- bin(bpis, binSize = 2)
+
+## Calculate correlation on the log2 transformed base peak intensities
+cormat <- cor(log2(do.call(cbind, lapply(bpis_bin, intensity))))
+colnames(cormat) <- rownames(cormat) <- spiked_data$sample_name
+
+## Define which phenodata columns should be highlighted in the plot
+ann <- data.frame(group = spiked_data$sample_group)
+rownames(ann) <- spiked_data$sample_name
+
+## Perform the cluster analysis
+pheatmap(cormat)
+
+
+
+
+rhino_duplo <- readMSData(files = list.files('rhino_data/duplo_regular/', full.names = T), mode = 'onDisk')
+
 in_path <- 'c://Users/Micah/Documents/LCAB/test_data_mzxml/raw/spike18.raw'
 MSConvert_CMD <- paste0("docker run --rm -v `pwd`:`pwd` -w `pwd` chambm/pwiz-skyline-i-agree-to-the-vendor-licenses wine msconvert ", in_path, " --mzXML")
 system(MSConvert_CMD)
@@ -24,14 +47,21 @@ for (i in seq_along(xcmslist)) {
 }
 
 # Plot all pseudospectra per sample
-plotData_single_sample <- plotdata_pseudospectra(list(test_data_msp))
-plotData_single_sample1 <- data.table::rbindlist(plotData, use.names = T)
+plotData_single_sample <- get_plotData_pseudospectra(spiked_data_msp)
+plotData_single_sample1 <- data.table::rbindlist(plotData_single_sample, use.names = T)
 
 plotData_msamples <- plotdata_pseudospectra(msplist)
 plotData_msamples1 <- data.table::rbindlist(plotData_msamples, use.names = T)
 
-p <- plot_chrom_tic_bpc(smSet_msamples$onDiskData, tic_visibility = 'legendonly')
-p <- plotdata_pseudospectra_traces(plotData_msamples, xcmslist = xcmslist, p)
+
+
+for (i in seq_along(plotData_single_sample)) {
+  print(plotData_single_samplei)
+}
+
+
+plotData_pseudospectra <- get_plotData_pseudospectra(spiked_data_msp)
+
 
 # Plot all found compounds
 plotData_compounds <- get_compound_plotData(bestmatches = bestmatches1, plotData = plotData_msamples)
@@ -39,23 +69,35 @@ p <- plot_chrom_tic_bpc(smSet_msamples$onDiskData, tic_visibility = 'legendonly'
 p <- plotdata_compounds_traces(plotData = plotData_compounds, p = p, msplist = msplist)
 
 # single sample
-plotData_compounds <- get_compound_plotData(bestmatches = bestmatches, plotData = plotdata_pseudospectra(test_data_msp))
-p <- plot_chrom_tic_bpc(smSet_test_data$onDiskData, tic_visibility = 'legendonly', source = 'p2')
+plotData_compounds <- get_plotData_compounds(bestmatches = bestmatches, plotData = get_plotData_pseudospectra(spiked_data_msp))
+p <- plot_chrom_tic_bpc(mSet_spiked_data$onDiskData, tic_visibility = 'legendonly', source = 'p2')
 p <- plotdata_compounds_traces(plotData = plotData_compounds, p = p, msplist = test_data_msp)
 
-
 for (i in seq_along(plotData_compounds)) {
-  p <- p %>% add_trace(data = plotData_compounds[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~Compound, name = ~paste0("Compounds: ", names(msplist)[i]))
-  p <- p %>% add_annotations(data = plotData_compounds[[i]], x = ~rt, y = ~intense, text = ~Compound, showlegend = F, showarrow = F)
+  p <- p %>% add_trace(data = plotData_compounds[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~Compound, name = ~paste0("Compounds: ", names(spiked_data_msp)[i]))
 }
-p
 
-p <- plot_alignment(raw_data = smSet_msamples, tic_visibility = NULL, source = 'p_alignment')
+p <- plot_chrom_tic_bpc(mSet_spiked_data$onDiskData, tic_visibility = 'legendonly')
+for (i in seq_along(plotData_compounds)) {
+  p <- p %>% add_trace(data = plotData_compounds[[i]], x = ~rt, y = ~intense, type = "scatter", mode = "markers", text = ~Compound, name = paste('Compounds: ', names(spiked_data_msp)[[i]]))
+}
+
+get_plotData_compounds <- function(bestmatches, plotData) {
+  compound_plotData <- vector('list', length = length(bestmatches))
+  compound_plotData <- lapply(seq_along(bestmatches), function(x) {
+    pspectra_nr <- as.integer(sub('.*Pseudospectrum_', '', names(bestmatches[[x]])))
+    compound_plotData_per_sample <- plotData[[x]][as.integer(pspectra_nr),]
+    top_compounds_per_sample <- vector(mode = 'character', length = length(bestmatches[[x]]))
+    top_compounds_per_sample <- sapply(seq_along(bestmatches[[x]]), function(y) {
+      bestmatches[[x]][[y]][[1]][1]
+    })
+    compound_plotData_per_sample <- cbind(compound_plotData_per_sample, Compound = top_compounds_per_sample)
+    compound_plotData_per_sample
+  })
+}
 
 
-
-
-
+pspectra_nr <- str_extract(string = names(bestmatches[[1]]), "[0-9]")
 
 
 
@@ -311,19 +353,7 @@ oke <- c(rbind(test_data_msp[[14]][, 1], test_data_msp[[14]][, 2]))
   
   
   
-  get_plotData_compounds <- function(bestmatches, plotData) {
-    compound_plotData <- vector('list', length = length(bestmatches))
-    compound_plotData <- lapply(seq_along(bestmatches), function(x) {
-      pspectra_nr <- str_extract(string = names(bestmatches[[x]]), "[0-9]")
-      compound_plotData_per_sample <- plotData[[x]][as.integer(pspectra_nr),]
-      top_compounds_per_sample <- vector(mode = 'character', length = length(bestmatches[[x]]))
-      top_compounds_per_sample <- sapply(seq_along(bestmatches[[x]]), function(y) {
-        bestmatches[[x]][[y]][[1]][1]
-      })
-      compound_plotData_per_sample <- cbind(compound_plotData_per_sample, Compound = top_compounds_per_sample)
-      compound_plotData_per_sample
-    })
-  }
+
   
   
   plot_align_spectra <- function(topSpectrum, botSpectrum) {
