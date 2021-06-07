@@ -49,7 +49,7 @@ ui <- dashboardPage(
   body = dashboardBody(
     tags$head(
       tags$style(HTML("
-      .datatable_zooi {
+      .datatable_look {
       overflow-x: auto;
       overflow-y: auto;
       font-size: 12px;
@@ -239,10 +239,13 @@ server <- function(input, output, session){
   ### functions
   {
   create_container <- function(sample_names) {
+    #' This function takes the samples names and
+    #' dynamically creates table containers for the amount of samples
+    #'  and their respective pseudospectra.
     containerlist <- vector(mode = 'list', length = length(sample_names))
     containerlist <- lapply(seq_along(sample_names), function(x) {
       container_dt = withTags(table(
-        class = 'datatable_zooi', 
+        class = 'datatable_look', 
         thead(
           tr(
             lapply(c(sample_names[[x]]), th, class = 'dt-center', colspan = 2, style = 'border-right: solid 1px; border-left: solid 1px;')),
@@ -253,6 +256,8 @@ server <- function(input, output, session){
   }
     
   plot_alignment <- function(raw_data, tic_visibility = NULL, source = NULL) {
+    #' This function takes the mSet data and creates a plotly figure showing the 
+    #' retention time before and after alignment.
     if (is.null(tic_visibility)) {
       hovermode <- "x"
     } else {
@@ -283,6 +288,7 @@ server <- function(input, output, session){
   }
     
   plot_align_spectra <- function(topSpectrum, botSpectrum) {
+    #' This function takes two mass spectra and aligns them in a plotly figure.
     top_spectrum <- data.frame(mz = topSpectrum[, 1], intensity = topSpectrum[, 2])
     top_spectrum$normalized <- round((top_spectrum$intensity/max(top_spectrum$intensity)) * 100)
     fig <- plot_ly() %>% add_bars(
@@ -299,6 +305,8 @@ server <- function(input, output, session){
   }  
     
   get_plotData_compounds <- function(bestmatches, plotData) {
+    #' This function takes the bestmatches and plotData in order to create the plotData
+    #' needed for the plotly figure of the detected compounds.
     compound_plotData <- vector('list', length = length(bestmatches))
     compound_plotData <- lapply(seq_along(bestmatches), function(x) {
       pspectra_nr <- as.integer(sub('.*Pseudospectrum_', '', names(bestmatches[[x]])))
@@ -313,6 +321,8 @@ server <- function(input, output, session){
   }
     
   plotdata_pseudospectra <- function(msps){
+    #' This function takes the MSP data in order to create the plotData
+    #' needed for the plotly figure of the created pseudospectra.
     plotData <- vector(mode = 'list', length = length(msps))
     for (i in seq_along(msps)){
       pseudospectrum <- lapply(seq_along(msps[[i]]), function(x){
@@ -327,6 +337,8 @@ server <- function(input, output, session){
   }
     
   plot_chrom_tic_bpc <- function(raw_data, tic_visibility = NULL, source = NULL) {
+    #' This function takes the raw data and creates a plotly figure showing the 
+    #' BPC and TIC.
     if (is.null(tic_visibility)) {
       hovermode <- "x"
     } else {
@@ -355,6 +367,8 @@ server <- function(input, output, session){
   }
   
   tophits <- function(similarity_scores, limit = 5, database, splashmatches, score_cutoff = 0.8) {
+    #' This function takes the similarity scores, database, and splashmatches in order to create 
+    #' a nested list containing the tophits per pseudospectrum per sample.
     totalmatches <- vector('list', length(similarity_scores))
     totalmatches <- lapply(seq_along(similarity_scores), function(z){
       indexes_per_sample <- vector(mode = 'list', length = length(similarity_scores[[z]]))
@@ -458,6 +472,7 @@ server <- function(input, output, session){
   
   
   mSet2xcmsSet <-  function(mSet) {
+    #' This function converts an mSet object into an xcmsSet object
     xs <- new("xcmsSet")
     xs@peaks <- mSet[["msFeatureData"]][["chromPeaks"]]
     rts <- list()
@@ -482,7 +497,7 @@ server <- function(input, output, session){
   }
   
   split_mSet <- function(mSet) {
-    #' This function splits the mSet object based on sample. 
+    #' This function splits the mSet object based on sample into xcmsSets. 
     f <- vector(mode = 'character', length = length(mSet$xcmsSet@phenoData$sample_name))
     f <- sapply(mSet$xcmsSet@phenoData$sample_name, function(x) {
       gsub(x = x, pattern = " ", replacement =  ".", fixed = T)
@@ -522,6 +537,7 @@ server <- function(input, output, session){
   
   
   output$filepaths <- renderText({
+    #' Here the filepath of the uploaded directory or file(s) is saved.
     if (!is.integer(input$infile)) {
       filelocation <- parseFilePaths(volumes, input$infile)
       rvalues$data_input <- filelocation
@@ -539,6 +555,8 @@ server <- function(input, output, session){
   
   
   # Dynamically set parameters
+  #' When parameters are uploaded, this piece of code changes the shown parameters.
+  #' If no parameters are uploaded, standard parameters are shown.
   rvalues$parameters <- reactive({
     req(input$upload_params)
     param_file <- input$upload_params 
@@ -575,7 +593,7 @@ server <- function(input, output, session){
     updateNumericInput(session, inputId = 'prof_step', label = 'profStep', value = rvalues$param_initial$prof_step, min = 0)
   })
   
-  
+  # This observeEvent handles the data upload
   observeEvent(input$upload, {
     req(rvalues$data_input)
     progress <- shiny::Progress$new()
@@ -593,6 +611,7 @@ server <- function(input, output, session){
     output$initial_plot <- renderPlotly(plot_chrom_tic_bpc(rvalues$raw_data, source = NULL))
     })
   
+  # This observeEvent runs when the 'inspect' button is clicked. Creates a 3D plot.
   observeEvent(input$runinspect, {
     req(rvalues$data_input)
     progress <- shiny::Progress$new()
@@ -601,19 +620,21 @@ server <- function(input, output, session){
     output$inspect_plot <- renderPlot(PerformDataInspect(rvalues$data_input$datapath))
   })
   
+  # Dynamically show the mz range
   output$mzrange <- renderText({
     req(rvalues$raw_data)
     mzrange <- c(min(rvalues$raw_data@featureData@data[["lowMZ"]]), max(rvalues$raw_data@featureData@data[["highMZ"]]))
     paste('MZ values range from: ', mzrange[1], ' to ', mzrange[2])
   })
   
+  # Dynamically show the rt range
   output$rtrange <- renderText({
     req(rvalues$raw_data)
     rtrange <- c(min(rvalues$raw_data@featureData@data[["retentionTime"]]), max(rvalues$raw_data@featureData@data[["retentionTime"]]))
     paste('Retention time ranges from: ', rtrange[1], ' to ', rtrange[2])
   })
   
-  
+  # This observeEvent runs when the 'XICinspect' button is clicked. Creates a XIC plot.
   observeEvent(input$runxicinspect, {
     req(input$min_mz, input$max_mz, input$min_rt, input$max_rt, rvalues$raw_data)
     withProgress(message = 'Plotting...', {
@@ -625,12 +646,14 @@ server <- function(input, output, session){
   })
 
 
-  # Observes
+  # Observes the current selected table of compounds.
   observe({
     rvalues$tableindex <- match(input$compoundbox, names(rvalues$matchmatrices))
     rvalues$currenttable <- paste0('table', rvalues$tableindex, '_cell_clicked')
   })
   
+  #' When the current selected table of compounds is clicked on, 
+  #' this shows the aligned mass spectra for the selected cell.
   observeEvent(input[[rvalues$currenttable]], {
     rank <- input[[rvalues$currenttable]]$row
     pspectra <- input[[rvalues$currenttable]]$col + 1
@@ -713,10 +736,7 @@ server <- function(input, output, session){
     })
   })
   
-  
-
-  
-  
+  # This observeEvent shows the peakinfo when clicked on.
   observeEvent(event_data(event = "plotly_click", priority = "event", source = 'p'), {
     shinyjs::show(id = 'selectedbox', anim = T)
     d <- event_data(event = "plotly_click", priority = "event", source = 'p')
@@ -733,6 +753,7 @@ server <- function(input, output, session){
 
   rvalues$checked <- list(NULL, NULL, NULL)
   
+  # Runs the creation of pseudospectra.
   observeEvent(input$createpspectra, {
     if (is.null(rvalues$dir_or_file) | rvalues$dir_or_file > 1){
       xcmslist <-  annotate_xcmslist(xcmslist = rvalues$xcmslist, perfwhm = input$perfwhm)
@@ -775,19 +796,13 @@ server <- function(input, output, session){
       shinyjs::hide(id = 'alignedmzspectrum')
       return(NULL)
     }
-    # fig <- plot_align_spectra(topSpectrum = rvalues$mSet_msp[[ja$sample_nr]][[1]], botSpectrum = rvalues$bestmatches_pspectra[[1]][[ja$pspectra_id]][[1]]$pspectrum)
     shinyjs::show(id = 'alignedmzspectrum', anim = T, animType = 'fade', asis = T)
     shinyjs::hide(id = 'vsp')
     shinyjs::hide(id = 'mzspectrum')
-    # OrgMassSpecR::SpectrumSimilarity(spec.top = rvalues$mSet_msp[[ja$sample_nr]][[ja$pspectra_id]], 
-    #                                  spec.bottom = rvalues$bestmatches_pspectra[[1]][[ja$pspectra_id]][[1]]$pspectrum, 
-    #                                  top.label = 'Detected compound', bottom.label = 'Database compound', 
-    #                                  print.alignment = F)
     output$alignedmzspectrum <- renderPlot(OrgMassSpecR::SpectrumSimilarity(spec.top = rvalues$mSet_msp[[ja$sample_nr]][[ja$pspectra_id]], 
                                                                             spec.bottom = rvalues$bestmatches_pspectra[[1]][[ja$pspectra_id]][[1]]$pspectrum, 
                                                                             top.label = 'Detected compound', bottom.label = 'Database compound', 
                                                                             print.alignment = F))
-    # output$alignedmzspectrum <- renderPlotly(fig)
   })
   
   
@@ -851,7 +866,7 @@ server <- function(input, output, session){
       output$compoundbox <- renderUI({
         ntabs <- length(matchmatrices)
         myTabs <- lapply(seq_along(ntabs), function(x){
-          tabPanel(paste0(names(matchmatrices[x])), dataTableOutput(outputId = paste0('table', x)) , class = "datatable_zooi") 
+          tabPanel(paste0(names(matchmatrices[x])), dataTableOutput(outputId = paste0('table', x)) , class = "datatable_look") 
         })
         do.call(what = shinydashboard::tabBox, args = c(myTabs, list(id = 'compoundbox', width = 12)))
       })
@@ -863,7 +878,7 @@ server <- function(input, output, session){
                                                  container = containerlist[[i]], selection = 'single')
       }
       rvalues$matchmatrices <- matchmatrices
-      plotData_compounds <- get_plotData_compounds(bestmatches = bestmatches, plotData = get_plotData_pseudospectra(rvalues$mSet_msp))
+      plotData_compounds <- get_plotData_compounds(bestmatches = bestmatches, plotData = plotdata_pseudospectra(rvalues$mSet_msp))
       rvalues$plotData_compounds <- plotData_compounds
       p2 <- plot_chrom_tic_bpc(rvalues$mSet$onDiskData, tic_visibility = 'legendonly', source = 'p2')
       for (i in seq_along(plotData_compounds)) {
@@ -873,12 +888,14 @@ server <- function(input, output, session){
         appendTab(inputId = 'plottabbox', tab = tabPanel(title = 'Compounds detected', plotlyOutput('foundcompounds')), select = T)
         rvalues$checked[[3]] <- 3
       }
+      saveRDS(similarity_scores, 'sim_scores')
+      saveRDS(rvalues$mSet, 'mSet')
       output$foundcompounds <- renderPlotly(p2)
     })
   })
   
   
-  # Run automatic parameter detection and update page with new values. NOT DONE
+  # Run automatic parameter detection and update page with new values.
   observeEvent(input$paramdetectrun, {
     if(!is.null(rvalues$dir_or_file) | is.null(rvalues$data_input)) {
       showModal(modalDialog(
