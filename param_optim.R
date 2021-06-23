@@ -66,13 +66,7 @@ ok213e <- lapply(seq_along(bestmatches), function(x){
     bestmatches[[x]][[y]][[1]][1]
   })
 })
-
 names(ok213e) <- mSet[["onDiskData"]]@phenoData@data[["sample_name"]]
-
-
-mara_vungu <- ok213e[-c(3:4)]
-
-
 heatmap_data <- function(sample_compound) {
   jaaa <- sapply(sample_compound, str_c)
   ja <- unique(unlist(jaaa))
@@ -88,6 +82,11 @@ heatmap_data <- function(sample_compound) {
   rownames(compound_matrix1) <- names(sample_compound)
   return(compound_matrix1)
 }
+
+mara_vungu <- ok213e[-c(3:4)]
+
+
+
 
 
 mara_hm <- heatmap_data(ok213e[1:2])

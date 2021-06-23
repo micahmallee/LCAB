@@ -16,7 +16,7 @@ library(metaMS)
 library(OrgMassSpecR)
 library(splashR)
 
-# Increase max upload size to 400 MB
+# Increase max upload size to 400 MB per file
 options(shiny.maxRequestSize=100*4096^2)
 
 # Preload MoNA_DB and SPLASH hashes
@@ -157,9 +157,9 @@ ui <- dashboardPage(
                       numericInput(inputId = 'snthresh', label = 'Signal to noise threshold', value = 100, min = 0),
                       bsTooltip(id = 'snthresh', title = 'Signal to noise ratio cut-off (intensity)', placement = 'right', trigger = 'hover'),
                       actionButton(inputId = 'peakdetectrun', label = 'Perform peak detection', width = '100%', style = 'margin-bottom:8px;'),
-                      actionButton(inputId = 'peakannotationrun', label = 'Perform peak annotation', width = '100%', style = 'margin-bottom:8px;'),
                       actionButton(inputId = 'createpspectra', label = HTML('Create pseudospectra'), width = '100%', style = 'margin-bottom:8px;'),
-                      actionButton(inputId = 'paramdetectrun', HTML("Automatic parameter <br/>optimization"), width = '100%')
+                      actionButton(inputId = 'peakannotationrun', label = 'Perform peak annotation', width = '100%', style = 'margin-bottom:8px;')
+                      # actionButton(inputId = 'paramdetectrun', HTML("Automatic parameter <br/>optimization"), width = '100%')
                   ),
                     box(id = 'align_param_box', width = 6, collapsible = T,
                         style = "font-size:11px;",
@@ -195,10 +195,15 @@ ui <- dashboardPage(
                     collapsible = T, 
                     collapsed = T,
                     numericInput(inputId = 'perfwhm', label = 'Full width half maximum', value = 0.6, min = 0, max = 1, step = 0.1),
+                    bsTooltip(id = 'perfwhm', title = 'percentage of the width of the FWHM (0-1)', placement = 'right', trigger = 'hover'),
                     numericInput(inputId = 'minfeat', label = 'Minimal features per pseudospectrum', value = 5, min = 1, max = 100, step = 1),
+                    bsTooltip(id = 'minfeat', title = 'Minimal amount of mass peaks per pseudospectrum', placement = 'right', trigger = 'hover'),
                     numericInput(inputId = 'minintens', label = 'Minimal intensity', value = 0.001, min = 0, max = 1, step = 0.01),
+                    bsTooltip(id = 'minintens', title = 'Minimal fraction intensity per mass peak. (1 = same value as highest peak in pseudospectra)', placement = 'right', trigger = 'hover'),
                     numericInput(inputId = 'score_cutoff', label = 'Score cut-off', value = 0.6, min = 0, max = 1, step = 0.1, width = '100%'),
-                    numericInput(inputId = 'hitamount', label = 'Amount of hits shown', value = 20, min = 1, max = 150, step = 5)
+                    bsTooltip(id = 'score_cutoff', title = 'Minimum similarity value (0-1)', placement = 'right', trigger = 'hover'),
+                    numericInput(inputId = 'hitamount', label = 'Amount of hits shown', value = 20, min = 1, max = 150, step = 5),
+                    bsTooltip(id = 'hitamount', title = 'Amount of hits shown per pseudospectrum', placement = 'right', trigger = 'hover')
                   ),
                   box(width = 12, collapsible = T, collapsed = T,
                       title = 'Upload or save parameters',
@@ -229,7 +234,7 @@ ui <- dashboardPage(
     )
   ),
   footer = dashboardFooter(
-    left = 'MetabOracle 0.8',
+    left = 'MetabOracle 1.0',
     right = 'Made by Micah Mallée'
   )
 )
@@ -572,6 +577,10 @@ server <- function(input, output, session){
   # Dynamically update parameters back- and front-end
   observe({
     rvalues$param_initial <- rvalues$parameters()
+    updateNumericInput(inputId = 'fwhm', label = 'FWHM', value = rvalues$param_initial$fwhm, min = 0.1, max = 6)
+    updateNumericInput(inputId = 'sigma', label = 'Sigma', value = rvalues$param_initial$sigma, min = 0)
+    updateNumericInput(inputId = 'steps', label = 'Steps', value = rvalues$param_initial$steps, min = 0)
+    updateSelectInput(session = session, inputId = 'peakpicking_flag', selected = rvalues$param_initial$Peak_method)
     updateNumericInput(session = session, inputId = 'ppm', label = 'ppm', value = rvalues$param_initial$ppm, min = 0)
     updateNumericInput(session = session, inputId = 'noise', label = 'Noise', value = rvalues$param_initial$noise, min = 0)
     updateNumericInput(session = session, inputId = 'min_peakwidth', label = 'Minimal peakwidth', value = rvalues$param_initial$min_peakwidth, min = 0)
@@ -928,8 +937,13 @@ server <- function(input, output, session){
       paste('params_', Sys.Date(), '.RData', sep = '')
     },
     content = function(file) {
-      param_initial <- SetPeakParam(platform = 'general', Peak_method = 'centWave', RT_method = input$rtmethod, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
-                                            snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter, mzdiff = input$mz_diff)
+      if (input$peakpicking_flag == 'centWave') {
+        param_initial <- SetPeakParam(platform = 'general', Peak_method = 'centWave', mzdiff = input$mz_diff, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
+                               snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
+      } else if (input$peakpicking_flag == 'matchedFilter') {
+        param_initial <- SetPeakParam(platform = 'general', Peak_method = input$peakpicking_flag, mzdiff = input$mz_diff,
+                               snthresh = input$snthresh, fwhm = input$fwhm, sigma = input$sigma, steps = input$steps, peakBinSize = input$peakBinSize)
+      }
       save(param_initial, file = file)
     }
   )
