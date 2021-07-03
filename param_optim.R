@@ -1,6 +1,6 @@
 library(MetaboAnalystR)
 # library(OptiLCMS)
-
+{
 # raw_data1 <- ImportRawMSData(foldername = 'rhino_data/params/', mode = 'inMemory', plotSettings = SetPlotParam(Plot = F))
 
 raw_data1 <- MetaboAnalystR::PerformDataTrimming(datapath = 'rhino_data/params/', plot = F, rt.idx = 1)
@@ -57,6 +57,8 @@ for (i in seq_along(bestmatches)) {
   colnames(matchmatrices[[i]]) <- sort(rep(names(bestmatches[[i]]), times = 2))
   naampjes[[i]] <- names(bestmatches[[i]])
 }
+}
+
 
 similarity_scores <- readRDS('shiny/sim_scores')
 mSet <- readRDS('shiny/mSet')
@@ -83,12 +85,9 @@ heatmap_data <- function(sample_compound) {
   return(compound_matrix1)
 }
 
+ok213e[[mSet[["onDiskData"]]@phenoData@data[["sample_name"]][[1]]]]
+
 mara_vungu <- ok213e[-c(3:4)]
-
-
-
-
-
 mara_hm <- heatmap_data(ok213e[1:2])
 naima_hm <- heatmap_data(ok213e[3:4])
 vungu_hm <- heatmap_data(ok213e[5:6])
@@ -111,6 +110,37 @@ pheatmap::pheatmap(mat = t(all_hm), scale = 'none', angle_col = 45, fontsize_row
 pheatmap::pheatmap(mat = t(naima_mara_hm), scale = 'none', angle_col = 45, fontsize_row = 8, cluster_rows = F, 
                    color = RColorBrewer::brewer.pal(n = 3, name = "Set1"))
 
+# ax <- list(
+#   zeroline = TRUE,
+#   showline = TRUE,
+#   mirror = "ticks",
+#   gridcolor = toRGB("gray50"),
+#   gridwidth = 2,
+#   zerolinecolor = toRGB("red"),
+#   zerolinewidth = 4,
+#   linecolor = toRGB("black"),
+#   linewidth = 6,
+#   titlefont=list(
+#     family = "Roman",
+#     size = 25
+#   )
+# )
+# 
+# ay <- list(
+#   zeroline = TRUE,
+#   showline = TRUE,
+#   mirror = "ticks",
+#   gridcolor = toRGB("gray50"),
+#   gridwidth = 2,
+#   zerolinecolor = toRGB("red"),
+#   zerolinewidth = 4,
+#   linecolor = toRGB("black"),
+#   linewidth = 6
+# )
+# 
+# plot_ly(z = t(mara_hm), type = 'heatmap', x = rownames(mara_hm), 
+#         y = colnames(mara_hm), colors = RColorBrewer::brewer.pal(n = 3, name = "Set1"), 
+#         hoverinfo = "y") %>% layout(xaxis = ax, yaxis = ay)
 
 system.time({
   ## Annotation steps 1 sample

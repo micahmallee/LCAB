@@ -230,7 +230,15 @@ ui <- dashboardPage(
                   ))),
                   uiOutput(outputId = 'compoundbox')
                   )
-                ))
+                )),
+      tabItem(tabName = 'comparesamples', 
+              fluidRow(column(width = 3,
+                box(width = NULL, title = 'Select samples to use in heatmap creation', uiOutput(outputId = 'checkboxes')
+              )),
+              column(width = 9,
+                box(width = NULL, title = 'Heatmap', plotOutput(outputId = 'heatmapfigure', height = 800))
+              )
+              ))
     )
   ),
   footer = dashboardFooter(
@@ -243,6 +251,24 @@ ui <- dashboardPage(
 server <- function(input, output, session){
   ### functions
   {
+  heatmap_data <- function(sample_compound) {
+    #' This function takes the bestmatches of x samples and returns a matrix 
+    #' useable for plotting.
+    all_names <- sapply(sample_compound, str_c)
+    all_names_unique <- unique(unlist(all_names))
+    compound_matrix1 <- matrix(nrow = length(sample_compound), ncol = length(all_names_unique))
+    for (i in seq_along(sample_compound)) {
+      for (j in seq_along(sample_compound[[i]])) {
+        sample_index <- match(sample_compound[[i]][[j]], all_names_unique)
+        compound_matrix1[i, sample_index] <- 1
+      }
+    }
+    compound_matrix1[is.na(compound_matrix1)] <- 0
+    colnames(compound_matrix1) <- all_names_unique
+    rownames(compound_matrix1) <- names(sample_compound)
+    return(compound_matrix1)
+  }
+    
   create_container <- function(sample_names) {
     #' This function takes the samples names and
     #' dynamically creates table containers for the amount of samples
@@ -549,12 +575,27 @@ server <- function(input, output, session){
       rvalues$dir_or_file <- length(filelocation$datapath)
       rvalues$data_input$datapath
     } else if (!is.integer(input$indir)) {
-      # rvalues$dir_or_file <- ''
       dirlocation <- parseDirPath(volumes, input$indir)
       rvalues$data_input <- dirlocation
       dirlocation
     } else {
       'No files have been selected'
+    }
+  })
+  
+  
+  #' Dynamically change the UI depending on the amount of samples uploaded.
+  #' If less than 2 samples are uploaded, the alignment parameters are not shown.
+  observeEvent(rvalues$data_input, {
+    if (is.null(rvalues$dir_or_file)){
+      shinyjs::show('align_param_box')
+      updateBox(id = 'picking_param_box', action = 'update', options = list(width = 6))
+    } else if (!is.null(rvalues$dir_or_file) & rvalues$dir_or_file == 1) {
+      shinyjs::hide('align_param_box')
+      updateBox(id = 'picking_param_box', action = 'update', options = list(width = 12))
+    } else if(!is.null(rvalues$dir_or_file) & rvalues$dir_or_file > 1) {
+      shinyjs::show('align_param_box')
+      updateBox(id = 'picking_param_box', action = 'update', options = list(width = 6))
     }
   })
   
@@ -626,7 +667,7 @@ server <- function(input, output, session){
     progress <- shiny::Progress$new()
     on.exit(progress$close())
     progress$set(message = "Creating plot", value = 10)
-    output$inspect_plot <- renderPlot(PerformDataInspect(rvalues$data_input$datapath))
+    output$inspect_plot <- renderPlot(PerformDataInspect(rvalues$data_input$datapath[1]))
   })
   
   # Dynamically show the mz range
@@ -661,6 +702,7 @@ server <- function(input, output, session){
     rvalues$currenttable <- paste0('table', rvalues$tableindex, '_cell_clicked')
   })
   
+  
   #' When the current selected table of compounds is clicked on, 
   #' this shows the aligned mass spectra for the selected cell.
   observeEvent(input[[rvalues$currenttable]], {
@@ -684,65 +726,74 @@ server <- function(input, output, session){
   # Run peak detection
   observeEvent(input$peakdetectrun, {
     withProgress(message = 'Running peak detection', {
-      if (input$peakpicking_flag == 'centWave') {
-        params <- SetPeakParam(platform = 'general', Peak_method = 'centWave', mzdiff = input$mz_diff, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
-                               snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
-      } else if (input$peakpicking_flag == 'matchedFilter') {
-        params <- SetPeakParam(platform = 'general', Peak_method = input$peakpicking_flag, mzdiff = input$mz_diff,
-                               snthresh = input$snthresh, fwhm = input$fwhm, sigma = input$sigma, steps = input$steps, peakBinSize = input$peakBinSize)
-      }
-      if(is.null(rvalues$raw_data)) {
+      tryCatch({
+        if (input$peakpicking_flag == 'centWave') {
+          params <- SetPeakParam(platform = 'general', Peak_method = 'centWave', mzdiff = input$mz_diff, ppm = input$ppm, noise = input$noise, min_peakwidth = input$min_peakwidth, max_peakwidth = input$max_peakwidth,
+                                 snthresh = input$snthresh, prefilter = input$prefilter, value_of_prefilter = input$v_prefilter)
+        } else if (input$peakpicking_flag == 'matchedFilter') {
+          params <- SetPeakParam(platform = 'general', Peak_method = input$peakpicking_flag, mzdiff = input$mz_diff,
+                                 snthresh = input$snthresh, fwhm = input$fwhm, sigma = input$sigma, steps = input$steps, peakBinSize = input$peakBinSize)
+        }
+        if(is.null(rvalues$raw_data)) {
+          showModal(modalDialog(
+            title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
+            'Please upload data first.',
+            easyClose = T
+          ))
+          return()
+        }
+        if (is.null(rvalues$dir_or_file)){
+          mSet <- PerformPeakProfiling(rvalues$raw_data, params, plotSettings = SetPlotParam(Plot = F))
+          xcmslist <-  split_mSet(mSet = mSet)
+          rvalues$xcmslist <- xcmslist
+        } else if (!is.null(rvalues$dir_or_file) & rvalues$dir_or_file == 1) {
+          mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
+          xcmsSet <- mSet2xcmsSet(mSet)
+          p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly', source = 'p')
+          samplename <- list(xcmsSet@phenoData["sample_name"][[1]])
+          plotData_peaks <- list(data.frame(xcmsSet@peaks))
+          rvalues$xcmsSet <- xcmsSet
+        } else if(!is.null(rvalues$dir_or_file) & rvalues$dir_or_file > 1) {
+          mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
+          mSet <- PerformPeakAlignment(mSet, param = updateRawSpectraParam(params))
+          mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(params))
+          xcmslist <-  split_mSet(mSet = mSet)
+          rvalues$xcmslist <- xcmslist
+        }
+        if (!is.null(rvalues$xcmslist)) {
+          p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly', source = 'p')
+          plotData_peaks <- vector(mode = 'list', length = length(xcmslist))
+          for (i in seq_along(xcmslist)) {
+            plotData_peaks[[i]] <- as.data.frame(xcmslist[[i]]@peaks)
+          }
+          for (i in plotData_peaks) { i$rt <- round(i$rt, 4)}
+          samplename <- sapply(xcmslist, function(x) x@phenoData[["sample_name"]])
+          if (is.null(rvalues$checked[[2]])) {
+            appendTab(inputId = 'plottabbox', tab = tabPanel(title = 'Alignment results', plotlyOutput('alignmentresults')), select = T)
+            rvalues$checked[[2]] <- 2
+          }
+          p_aligned <- plot_alignment(raw_data = mSet, tic_visibility = NULL, source = 'p_aligned')
+          output$alignmentresults <- renderPlotly(p_aligned)
+        }
+        rvalues$plotData_peaks <- plotData_peaks
+        for (i in seq_along(plotData_peaks)) {
+          p <- p %>% add_trace(data = plotData_peaks[[i]],
+                               x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz,
+                               name = paste(samplename[i], ' total peaks'))
+        }
+        mSet$onDiskData@phenoData@data$sample_name <- rvalues$raw_data@phenoData@data[["sample_name"]]
+        rvalues$mSet <- mSet
+        output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
+        output$foundpeaks <- renderPlotly(p)
+      }, error = function(e) {
         showModal(modalDialog(
-          title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> Not so fast! <span>'),
-          'Please upload data first.',
+          title = HTML('<span style="color:#8C9398; font-size: 20px; font-weight:bold; font-family:sans-serif "> No peaks found <span>'),
+          'Try changing the parameters, 
+          SN treshold might be too high.',
           easyClose = T
         ))
-        return()
-      }
-      if (is.null(rvalues$dir_or_file)){
-        mSet <- PerformPeakProfiling(rvalues$raw_data, params, plotSettings = SetPlotParam(Plot = F))
-        xcmslist <-  split_mSet(mSet = mSet)
-        rvalues$xcmslist <- xcmslist
-      } else if (!is.null(rvalues$dir_or_file) & rvalues$dir_or_file == 1) {
-        mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
-        xcmsSet <- mSet2xcmsSet(mSet)
-        p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly', source = 'p')
-        samplename <- list(xcmsSet@phenoData["sample_name"][[1]])
-        plotData_peaks <- list(data.frame(xcmsSet@peaks))
-        rvalues$xcmsSet <- xcmsSet
-      } else if(!is.null(rvalues$dir_or_file) & rvalues$dir_or_file > 1) {
-        mSet <- PerformPeakPicking(rvalues$raw_data, updateRawSpectraParam(params))
-        mSet <- PerformPeakAlignment(mSet, param = updateRawSpectraParam(params))
-        mSet <- PerformPeakFiling(mSet, param = updateRawSpectraParam(params))
-        xcmslist <-  split_mSet(mSet = mSet)
-        rvalues$xcmslist <- xcmslist
-      }
-      if (!is.null(rvalues$xcmslist)) {
-        p <- plot_chrom_tic_bpc(mSet$onDiskData, tic_visibility = 'legendonly', source = 'p')
-        plotData_peaks <- vector(mode = 'list', length = length(xcmslist))
-        for (i in seq_along(xcmslist)) {
-          plotData_peaks[[i]] <- as.data.frame(xcmslist[[i]]@peaks)
-        }
-        for (i in plotData_peaks) { i$rt <- round(i$rt, 4)}
-        samplename <- sapply(xcmslist, function(x) x@phenoData[["sample_name"]])
-        if (is.null(rvalues$checked[[2]])) {
-          appendTab(inputId = 'plottabbox', tab = tabPanel(title = 'Alignment results', plotlyOutput('alignmentresults')), select = T)
-          rvalues$checked[[2]] <- 2
-        }
-        p_aligned <- plot_alignment(raw_data = mSet, tic_visibility = NULL, source = 'p_aligned')
-        output$alignmentresults <- renderPlotly(p_aligned)
-      }
-      rvalues$plotData_peaks <- plotData_peaks
-      for (i in seq_along(plotData_peaks)) {
-        p <- p %>% add_trace(data = plotData_peaks[[i]],
-                             x = ~rt, y = ~maxo, type = "scatter", mode = "markers", text = ~mz,
-                             name = paste(samplename[i], ' total peaks'))
-      }
-      mSet$onDiskData@phenoData@data$sample_name <- rvalues$raw_data@phenoData@data[["sample_name"]]
-      rvalues$mSet <- mSet
-      output$peakamount <- renderText(paste0('Amount of found peaks: ', mSet[["msFeatureData"]][["chromPeakData"]]@nrows))
-      output$foundpeaks <- renderPlotly(p)
-    })
+      })
+      })
   })
   
   # This observeEvent shows the peakinfo when clicked on.
@@ -863,6 +914,7 @@ server <- function(input, output, session){
       bestmatches_pspectra <- lapply(bestmatches, function(x) lapply(x, function(y) lapply(y, function(z) z[3])))
       rvalues$bestmatches_pspectra <- bestmatches_pspectra
       bestmatches <- lapply(bestmatches, function(x) lapply(x, function(y) lapply(y, function(z) z[-3])))
+      rvalues$bestmatches <- bestmatches
       matchmatrices <- vector(mode = 'list', length = length(bestmatches))
       names(matchmatrices) <- rvalues$mSet[["onDiskData"]]@phenoData@data[["sample_name"]]
       sample_names <- vector(mode = 'list', length(bestmatches))
@@ -947,6 +999,39 @@ server <- function(input, output, session){
       save(param_initial, file = file)
     }
   )
+  
+  # Heatmap creation
+  ## Checks if annotation has been performed. If yes, shows selectable samples.
+  ## once user clicks the run button, heatmap is generated and shown.
+  output$checkboxes <- renderUI({
+    req(rvalues$mSet)
+    outputs <- tagList()
+    choice <- rvalues$mSet[["onDiskData"]]@phenoData@data[["sample_name"]]
+    outputs[[1]] <- checkboxGroupInput(inputId = 'checkboxsamples', label = 'Select samples', choices = choice, selected = NULL)
+    outputs[[2]] <- actionButton(inputId = 'runheatmap', label = 'Create heatmap with selected samples')
+    outputs
+  })
+  
+  # rvalues$mSet <- readRDS('mSet')
+  # rvalues$bestmatches <- readRDS('bestmatches')
+  
+  observeEvent(input$runheatmap, {
+    withProgress({
+      # similarity_scores <- readRDS('sim_scores')
+      bestmatches <- rvalues$bestmatches
+      top_compounds <- lapply(seq_along(bestmatches), function(x){
+        top_compounds_per_sample <- sapply(seq_along(bestmatches[[x]]), function(y) {
+          bestmatches[[x]][[y]][[1]][1]
+        })
+      })
+      names(top_compounds) <- rvalues$mSet[["onDiskData"]]@phenoData@data[["sample_name"]]
+      selected_samples_heatmap_data <- heatmap_data(top_compounds[input$checkboxsamples])
+      output$heatmapfigure <- renderPlot(pheatmap::pheatmap(mat = t(selected_samples_heatmap_data), scale = 'none', angle_col = 45, fontsize_row = 8, cluster_rows = F, 
+                                                            color = RColorBrewer::brewer.pal(n = 3, name = "Set1")))
+    })
+  })
+  
+  
 }
 
 
