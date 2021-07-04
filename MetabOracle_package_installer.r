@@ -3,19 +3,19 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 
 if (!requireNamespace("devtools", quietly = TRUE))
   install.packages("devtools")
-
-
 install.packages("pacman")
 library(pacman)
 library(devtools)
 
-pacman::p_load(c("impute", "pcaMethods", "globaltest", "GlobalAncova", "Rgraphviz", "preprocessCore", 
-                 "genefilter", "SSPA", "sva", "limma", "KEGGgraph", "siggenes","BiocParallel", "MSnbase", 
-                 "multtest","RBGL","edgeR","fgsea","httr","qs", "plotly", "shinyFiles", "xcms", "shinycssloaders",
-                 "magrittr", "Rcpp", "CAMERA", "shiny", "shinyjs", "stringr", "mzR", "metaMS", "shinyBS", "DT", 
-                 "OrgMassSpecR", "shinydashboard", "crosstalk", "digest", "ggplot2", "shinydashboardPlus"))
+pacman::p_load("impute", "pcaMethods", "globaltest", "GlobalAncova", "Rgraphviz", 
+               "preprocessCore", "genefilter", "SSPA", "sva", "limma", "KEGGgraph",
+               "siggenes","BiocParallel", "MSnbase", "multtest","RBGL","edgeR",
+               "fgsea","httr","qs")
+install.packages(c('glasso', 'crmn','plotly', 'magrittr', 'shinyFiles', 'shinycssloaders',
+                   'shiny', 'shinyjs', 'stringr', 'shinyBS', 'DT',
+                   'OrgMassSpecR', 'shinydashboard', 'crosstalk', 'shinydashboardPlus'))
 
-
+BiocManager::install('metaMS')
 
 
 devtools::install_github("xia-lab/MetaboAnalystR", build = TRUE, build_vignettes = FALSE)

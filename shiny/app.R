@@ -924,20 +924,26 @@ server <- function(input, output, session){
         sample_names[[i]] <- names(bestmatches[[i]])
       }
       containerlist <- create_container(sample_names)
+      
       output$compoundbox <- renderUI({
-        ntabs <- length(matchmatrices)
-        myTabs <- lapply(seq_along(ntabs), function(x){
+        ntabs = length(matchmatrices)
+        
+        myTabs = lapply(seq_len(ntabs), function(x){
+          
           tabPanel(paste0(names(matchmatrices[x])), dataTableOutput(outputId = paste0('table', x)) , class = "datatable_look") 
         })
         do.call(what = shinydashboard::tabBox, args = c(myTabs, list(id = 'compoundbox', width = 12)))
       })
-      for (i in seq_along(matchmatrices)) {
-        output[[paste0('table', i)]] <- renderDT(matchmatrices[[i]], class = 'cell-border stripe', extensions = 'Buttons',
-                                                 options = list(dom = 'Bfrtip', buttons = list('copy', 'print', list(extend = 'collection', buttons = c('csv', 'excel', 'pdf'), text = 'Download')),
-                                                                paging = F, searching = F),
-                                                 filter = list(position = 'top', clear = F), rownames = F,
-                                                 container = containerlist[[i]], selection = 'single')
-      }
+      
+      lapply(seq_len(length(bestmatches)), function(i) {
+        output[[paste0("table",i)]] <- DT::renderDataTable(
+          matchmatrices[[i]], class = 'cell-border stripe', extensions = 'Buttons',
+          options = list(dom = 'Bfrtip', buttons = list('copy', 'print', list(extend = 'collection', buttons = c('csv', 'excel', 'pdf'), text = 'Download')),
+                         paging = F, searching = F),
+          filter = list(position = 'top', clear = F), rownames = F,
+          container = containerlist[[i]], selection = 'single'
+        )
+      })  
       rvalues$matchmatrices <- matchmatrices
       plotData_compounds <- get_plotData_compounds(bestmatches = bestmatches, plotData = plotdata_pseudospectra(rvalues$mSet_msp))
       rvalues$plotData_compounds <- plotData_compounds
@@ -1012,12 +1018,11 @@ server <- function(input, output, session){
     outputs
   })
   
-  # rvalues$mSet <- readRDS('mSet')
-  # rvalues$bestmatches <- readRDS('bestmatches')
+  rvalues$mSet <- readRDS('mSet')
+  rvalues$bestmatches <- readRDS('bestmatches')
   
   observeEvent(input$runheatmap, {
     withProgress({
-      # similarity_scores <- readRDS('sim_scores')
       bestmatches <- rvalues$bestmatches
       top_compounds <- lapply(seq_along(bestmatches), function(x){
         top_compounds_per_sample <- sapply(seq_along(bestmatches[[x]]), function(y) {
